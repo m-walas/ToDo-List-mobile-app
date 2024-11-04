@@ -8,6 +8,9 @@ node_modules/
 dist/
 web-build/
 
+# Active users expo
+%ProgramData%\Microsoft\Windows\*
+
 # Native
 *.orig.*
 *.jks
@@ -33,3 +36,6 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+
+# .vscode
+.vscode/
