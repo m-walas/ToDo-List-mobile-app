@@ -1,44 +1,145 @@
 // screens/LoginScreen.js
-import React, { useState } from 'react';
-import { View, TextInput, Button, Text, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, Alert, TextInput, TouchableOpacity, Image } from 'react-native';
+import { Button, Text, useTheme } from 'react-native-paper';
+import * as AuthSession from 'expo-auth-session';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GITHUB_CLIENT_ID, GITHUB_REDIRECT_URI } from '@env';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase';
+import { useThemeContext } from '../App';
 
 export default function LoginScreen({ navigation }) {
+  const { colors } = useTheme();
+  const { isDarkTheme } = useThemeContext();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  const [request, response, promptAsync] = AuthSession.useAuthRequest(
+    {
+      clientId: GITHUB_CLIENT_ID,
+      scopes: ['read:user', 'user:email', 'repo'],
+      redirectUri: GITHUB_REDIRECT_URI,
+      usePKCE: true,
+    },
+    {
+      authorizationEndpoint: 'https://github.com/login/oauth/authorize',
+      tokenEndpoint: 'https://github.com/login/oauth/access_token',
+    }
+  );
+
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { code } = response.params;
+      exchangeCodeForToken(code);
+    }
+  }, [response]);
+
+  const exchangeCodeForToken = async (code) => {
+    try {
+      const clientId = GITHUB_CLIENT_ID;
+      const codeVerifier = request.codeVerifier;
+      const url = 'https://github.com/login/oauth/access_token';
+
+      const params = {
+        client_id: clientId,
+        code,
+        code_verifier: codeVerifier,
+        redirect_uri: GITHUB_REDIRECT_URI,
+      };
+
+      const formBody = Object.keys(params)
+        .map((key) => encodeURIComponent(key) + '=' + encodeURIComponent(params[key]))
+        .join('&');
+
+      const tokenResponse = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formBody,
+      });
+
+      const data = await tokenResponse.json();
+
+      if (data.access_token) {
+        await AsyncStorage.setItem('githubAccessToken', data.access_token);
+
+        const userResponse = await fetch('https://api.github.com/user', {
+          headers: {
+            Authorization: `token ${data.access_token}`,
+          },
+        });
+
+        const userData = await userResponse.json();
+        console.log('GitHub User Data:', userData);
+
+        Alert.alert('Sukces', 'Zalogowano przez GitHub!');
+        navigation.navigate('ToDoList');
+      } else {
+        Alert.alert('Błąd', 'Nie udało się uzyskać tokenu dostępu.');
+      }
+    } catch (error) {
+      console.error('Error exchanging code for token:', error);
+      Alert.alert('Błąd', 'Logowanie przez GitHub nie powiodło się.');
+    }
+  };
 
   const loginUser = () => {
     signInWithEmailAndPassword(auth, email, password)
       .then(() => {
-        // Użytkownik zalogowany, nawigacja do ToDoListScreen
+        navigation.navigate('ToDoList');
       })
       .catch((error) => alert(error.message));
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Logowanie</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Image
+        source={require('../assets/logo.png')}
+        style={styles.logo}
+        resizeMode="contain"
+      />
+
       <TextInput
-        style={styles.input}
+        style={[styles.input, { color: colors.text, borderColor: colors.primary }]}
         placeholder="Email"
+        placeholderTextColor={colors.placeholder || '#888'}
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
         keyboardType="email-address"
       />
       <TextInput
-        style={styles.input}
+        style={[styles.input, { color: colors.text, borderColor: colors.primary }]}
         placeholder="Hasło"
+        placeholderTextColor={colors.placeholder || '#888'}
         secureTextEntry
         value={password}
         onChangeText={setPassword}
       />
-      <Button title="Zaloguj się" onPress={loginUser} />
+      <Button mode="contained" onPress={loginUser} style={styles.button}>
+        Zaloguj się
+      </Button>
+
+      <View style={styles.separator} />
+
       <Button
-        title="Zarejestruj się"
-        onPress={() => navigation.navigate('Register')}
-      />
+        mode="outlined"
+        onPress={() => {
+          promptAsync();
+        }}
+        style={styles.button}
+      >
+        Zaloguj się przez GitHub
+      </Button>
+
+      <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+        <Text style={[styles.registerText, { color: colors.primary }]}>
+          Nie masz konta? Zarejestruj się.
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -49,16 +150,27 @@ const styles = StyleSheet.create({
     padding: 20,
     justifyContent: 'center',
   },
-  title: {
-    fontSize: 24,
-    marginBottom: 20,
-    textAlign: 'center',
+  logo: {
+    width: 150,
+    height: 150,
+    alignSelf: 'center',
+    marginBottom: 30,
   },
   input: {
-    height: 40,
-    borderColor: 'gray',
+    height: 50,
     borderWidth: 1,
     marginBottom: 15,
-    paddingHorizontal: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+  },
+  separator: {
+    height: 20,
+  },
+  button: {
+    marginBottom: 10,
+  },
+  registerText: {
+    marginTop: 20,
+    textAlign: 'center',
   },
 });
