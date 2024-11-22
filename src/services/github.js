@@ -1,12 +1,13 @@
-// services/github.js
+// src/services/github.js
+
 import axios from 'axios';
 
 /**
- * Pobiera issues z repozytorium GitHuba.
- * @param {string} accessToken - Token dostępu GitHub.
- * @param {string} repoOwner - Właściciel repozytorium.
- * @param {string} repoName - Nazwa repozytorium.
- * @returns {Promise<Array>} - Lista issues.
+ * Fetches issues from a GitHub repository.
+ * @param {string} accessToken - GitHub access token.
+ * @param {string} repoOwner - Repository owner.
+ * @param {string} repoName - Repository name.
+ * @returns {Promise<Array>} - List of issues.
  */
 export const fetchGitHubIssues = async (accessToken, repoOwner, repoName) => {
   try {
@@ -15,7 +16,7 @@ export const fetchGitHubIssues = async (accessToken, repoOwner, repoName) => {
         Authorization: `token ${accessToken}`,
       },
       params: {
-        state: 'all', // info: Pobieranie zarówno opened, jak i closed issues
+        state: 'all',
       },
     });
     return response.data;
@@ -26,9 +27,9 @@ export const fetchGitHubIssues = async (accessToken, repoOwner, repoName) => {
 };
 
 /**
- * Przekształca issues na format zrozumiały dla aplikacji.
- * @param {Array} issues - Lista issues z GitHuba.
- * @returns {Array} - Przekształcone zadania.
+ * Maps GitHub issues to tasks for the app.
+ * @param {Array} issues - List of GitHub issues.
+ * @returns {Array} - Mapped tasks.
  */
 export const mapIssuesToTasks = (issues) => {
   return issues.map(issue => ({

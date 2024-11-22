@@ -1,25 +1,30 @@
 // App.js
 import 'react-native-gesture-handler';
-import React, { useState, useEffect, createContext, useContext } from 'react';
-import { NavigationContainer, DefaultTheme as NavigationDefaultTheme, DarkTheme as NavigationDarkTheme } from '@react-navigation/native';
+import React, { useState, useEffect } from 'react';
+import {
+  NavigationContainer,
+  DefaultTheme as NavigationDefaultTheme,
+  DarkTheme as NavigationDarkTheme,
+} from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { auth } from './firebase';
+import { auth } from './src/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import LoginScreen from './screens/LoginScreen';
-import RegisterScreen from './screens/RegisterScreen';
-import ToDoListScreen from './screens/ToDoListScreen';
+import LoginScreen from './src/screens/LoginScreen';
+import RegisterScreen from './src/screens/RegisterScreen';
+import AppNavigator from './src/navigation/AppNavigator';
 
-import { Provider as PaperProvider, DefaultTheme as PaperDefaultTheme, DarkTheme as PaperDarkTheme } from 'react-native-paper';
+import {
+  Provider as PaperProvider,
+  MD3LightTheme as PaperDefaultTheme,
+  MD3DarkTheme as PaperDarkTheme,
+} from 'react-native-paper';
 import { useColorScheme } from 'react-native';
 
+import ThemeContext from './src/contexts/ThemeContext';
+
 const Stack = createStackNavigator();
-
-// NOTE: Tworzenie kontekstu dla motywów
-const ThemeContext = createContext();
-
-export const useThemeContext = () => useContext(ThemeContext);
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -33,7 +38,6 @@ export default function App() {
     return unsubscribe;
   }, []);
 
-  // NOTE: Funkcja przełączająca motyw
   const toggleTheme = async () => {
     const newTheme = !isDarkTheme;
     setIsDarkTheme(newTheme);
@@ -65,8 +69,10 @@ export default function App() {
       ...NavigationDefaultTheme.colors,
       ...PaperDefaultTheme.colors,
       background: '#ffffff',
-      text: '#333333',
-      primary: '#24292e',
+      text: '#24292e',
+      primary: '#0366d6',
+      accent: '#586069',
+      surface: '#f6f8fa',
     },
   };
 
@@ -76,9 +82,12 @@ export default function App() {
     colors: {
       ...NavigationDarkTheme.colors,
       ...PaperDarkTheme.colors,
-      background: '#0d1117',
-      text: '#c9d1d9',
-      primary: '#58a6ff',
+      background: '#121212', // Ciemniejsze tło
+      text: '#FFFFFF', // Jasny tekst
+      primary: '#BB86FC', // Jasny kolor akcentujący
+      accent: '#03DAC6', // Jasny kolor akcentujący
+      surface: '#1E1E1E', // Ciemniejsze powierzchnie
+      // Dodaj więcej kolorów w razie potrzeby
     },
   };
 
@@ -90,7 +99,7 @@ export default function App() {
         <NavigationContainer theme={theme}>
           <Stack.Navigator screenOptions={{ headerShown: false }}>
             {user ? (
-              <Stack.Screen name="ToDoList" component={ToDoListScreen} />
+              <Stack.Screen name="Main" component={AppNavigator} />
             ) : (
               <>
                 <Stack.Screen name="Login" component={LoginScreen} />

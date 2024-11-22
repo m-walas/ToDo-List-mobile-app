@@ -1,4 +1,5 @@
-// screens/LoginScreen.js
+// src/screens/LoginScreen.js
+
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Alert, TextInput, TouchableOpacity, Image } from 'react-native';
 import { Button, Text, useTheme } from 'react-native-paper';
@@ -7,11 +8,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GITHUB_CLIENT_ID, GITHUB_REDIRECT_URI } from '@env';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase';
-import { useThemeContext } from '../App';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function LoginScreen({ navigation }) {
   const { colors } = useTheme();
-  const { isDarkTheme } = useThemeContext();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -66,17 +66,9 @@ export default function LoginScreen({ navigation }) {
       if (data.access_token) {
         await AsyncStorage.setItem('githubAccessToken', data.access_token);
 
-        const userResponse = await fetch('https://api.github.com/user', {
-          headers: {
-            Authorization: `token ${data.access_token}`,
-          },
-        });
-
-        const userData = await userResponse.json();
-        console.log('GitHub User Data:', userData);
-
+        // Fetch user data if needed
         Alert.alert('Sukces', 'Zalogowano przez GitHub!');
-        navigation.navigate('ToDoList');
+        navigation.navigate('Main');
       } else {
         Alert.alert('Błąd', 'Nie udało się uzyskać tokenu dostępu.');
       }
@@ -89,15 +81,15 @@ export default function LoginScreen({ navigation }) {
   const loginUser = () => {
     signInWithEmailAndPassword(auth, email, password)
       .then(() => {
-        navigation.navigate('ToDoList');
+        navigation.navigate('Main');
       })
       .catch((error) => alert(error.message));
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <Image
-        source={require('../assets/logo.png')}
+        source={require('../../assets/images/logo.png')}
         style={styles.logo}
         resizeMode="contain"
       />
@@ -140,7 +132,7 @@ export default function LoginScreen({ navigation }) {
           Nie masz konta? Zarejestruj się.
         </Text>
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 }
 

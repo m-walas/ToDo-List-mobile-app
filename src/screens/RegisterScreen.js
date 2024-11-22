@@ -1,9 +1,11 @@
-// screens/RegisterScreen.js
+// src/screens/RegisterScreen.js
+
 import React, { useState } from 'react';
-import { View, TextInput, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { TextInput, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native';
 import { Button, Text, useTheme } from 'react-native-paper';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function RegisterScreen({ navigation }) {
   const { colors } = useTheme();
@@ -14,15 +16,15 @@ export default function RegisterScreen({ navigation }) {
     createUserWithEmailAndPassword(auth, email, password)
       .then(() => {
         Alert.alert('Sukces', 'Rejestracja powiodła się!');
-        navigation.navigate('ToDoList');
+        navigation.navigate('Main');
       })
       .catch((error) => alert(error.message));
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <Image
-        source={require('../assets/logo.png')}
+        source={require('../../assets/images/logo.png')}
         style={styles.logo}
         resizeMode="contain"
       />
@@ -53,7 +55,7 @@ export default function RegisterScreen({ navigation }) {
           Masz już konto? Zaloguj się.
         </Text>
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 }
 
