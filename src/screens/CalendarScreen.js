@@ -1,48 +1,71 @@
-// src/screens/CalendarScreen.js
+// src/screens/HeatmapCalendarScreen.js
 
-import React, { useState, useEffect, memo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  View, 
   StyleSheet, 
-  Alert, 
-  Platform, 
-  UIManager, 
   ActivityIndicator, 
-  FlatList, 
-  TouchableOpacity 
+  Alert, 
+  TouchableOpacity, 
+  View, 
+  FlatList 
 } from 'react-native';
-import { Text, useTheme, FAB, Portal, Modal, List, Button } from 'react-native-paper';
+import { 
+  Text, 
+  FAB, 
+  Portal, 
+  Modal, 
+  List, 
+  Button, 
+  useTheme 
+} from 'react-native-paper';
 import { Calendar } from 'react-native-calendars';
-import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { 
+  collection, 
+  query, 
+  where, 
+  onSnapshot, 
+  doc, 
+  updateDoc 
+} from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-if (
-  Platform.OS === 'android' &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+// Importowanie kolorów z colors.js
+import { COLORS } from '../constants/colors';
 
-const TaskItem = memo(({ item, onPress }) => (
-  <TouchableOpacity style={[styles.taskItem, { backgroundColor: item.color }]} onPress={onPress}>
-    <Text style={styles.taskText}>{item.name}</Text>
-  </TouchableOpacity>
-));
+// Konfiguracja lokalizacji (opcjonalnie)
+import { LocaleConfig } from 'react-native-calendars';
+LocaleConfig.locales['pl'] = {
+  monthNames: [
+    'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
+    'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'
+  ],
+  monthNamesShort: [
+    'Sty', 'Lu', 'Mar', 'Kw', 'Maj', 'Cze',
+    'Lip', 'Sie', 'Wrz', 'Paź', 'Lis', 'Gru'
+  ],
+  dayNames: [
+    'Niedziela', 'Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota'
+  ],
+  dayNamesShort: ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So'],
+  today: 'Dziś'
+};
+LocaleConfig.defaultLocale = 'pl';
 
-export default function CalendarScreen() {
+export default function HeatmapCalendarScreen() {
   const { colors } = useTheme();
   const navigation = useNavigation();
+  const [tasks, setTasks] = useState([]);
   const [markedDates, setMarkedDates] = useState({});
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [tasks, setTasks] = useState({});
-  const [boards, setBoards] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [tasksForSelectedDate, setTasksForSelectedDate] = useState([]);
   const [moveModalVisible, setMoveModalVisible] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [availableBoards, setAvailableBoards] = useState([]);
 
+  // Fetch boards (tablice użytkownika)
   useEffect(() => {
     const boardsRef = collection(db, 'boards');
     const qBoards = query(boardsRef, where('userId', '==', auth.currentUser.uid));
@@ -52,7 +75,6 @@ export default function CalendarScreen() {
       querySnapshot.forEach((doc) => {
         fetchedBoards.push({ id: doc.id, ...doc.data() });
       });
-      setBoards(fetchedBoards);
       setAvailableBoards(fetchedBoards);
     });
 
@@ -61,22 +83,21 @@ export default function CalendarScreen() {
     };
   }, []);
 
+  // Fetch tasks (zadania użytkownika)
   useEffect(() => {
     const tasksRef = collection(db, 'tasks');
     const qTasks = query(tasksRef, where('userId', '==', auth.currentUser.uid));
 
     const unsubscribeTasks = onSnapshot(qTasks, (querySnapshot) => {
-      const newTasks = {};
-      const datesSet = new Set();
+      const fetchedTasks = [];
 
-      querySnapshot.forEach((doc) => {
-        const task = doc.data();
-        if (!task.deadline || !task.boardId) return;
+      querySnapshot.forEach((docSnap) => {
+        const task = docSnap.data();
+        // Filtrujemy tylko niedokończone zadania
+        if (!task.deadline || !task.boardId || task.isCompleted) return;
 
-        const board = boards.find((b) => b.id === task.boardId);
+        const board = availableBoards.find((b) => b.id === task.boardId);
         if (!board) return;
-
-        const color = board.color || colors.primary;
 
         let date;
         try {
@@ -93,56 +114,57 @@ export default function CalendarScreen() {
             throw new Error('Unknown deadline format');
           }
         } catch (error) {
-          console.warn(`Błąd konwersji daty dla zadania ID: ${doc.id}`, error);
+          console.warn(`Error converting date for task ID: ${docSnap.id}`, error);
           return;
         }
 
         if (date) {
-          if (!newTasks[date]) {
-            newTasks[date] = [];
-          }
-
-          newTasks[date].push({
-            id: doc.id,
-            name: task.text || 'Brak nazwy',
-            color: color || '#0366d6',
+          fetchedTasks.push({
+            id: docSnap.id,
+            name: task.text || 'No Name',
+            color: board.color || colors.primary,
+            description: task.description || '',
+            boardName: board.name || 'No Board Name',
+            deadline: date
           });
-
-          datesSet.add(date);
         }
       });
 
-      const marks = {};
-      datesSet.forEach((date) => {
-        marks[date] = { marked: true, dotColor: colors.primary };
-      });
-      marks[selectedDate] = { ...marks[selectedDate], selected: true, selectedColor: colors.primary };
-
-      setMarkedDates(marks);
-      setTasks(newTasks);
+      setTasks(fetchedTasks);
       setLoading(false);
+
+      // Aktualizacja markedDates
+      const dates = {};
+      fetchedTasks.forEach(task => {
+        if (!dates[task.deadline]) {
+          dates[task.deadline] = { dots: [] };
+        }
+        dates[task.deadline].dots.push({ color: task.color });
+      });
+
+      // Dodanie dzisiejszej daty
+      const today = new Date().toISOString().split('T')[0];
+      dates[today] = {
+        ...(dates[today] || {}),
+        selected: true,
+        selectedColor: colors.primary,
+      };
+
+      setMarkedDates(dates);
     });
 
     return () => {
       unsubscribeTasks();
     };
-  }, [boards, colors.primary, selectedDate]);
+  }, [availableBoards, colors.primary]);
 
   const onDayPress = (day) => {
     setSelectedDate(day.dateString);
-    setMarkedDates(prevMarks => ({
-      ...prevMarks,
-      [day.dateString]: { ...prevMarks[day.dateString], selected: true, selectedColor: colors.primary },
-      [selectedDate]: { ...prevMarks[selectedDate], selected: false, selectedColor: colors.primary },
-    }));
+    const tasksForDay = tasks.filter(task => task.deadline === day.dateString);
+    setTasksForSelectedDate(tasksForDay);
   };
 
-  const openMoveModal = (taskId) => {
-    setSelectedTaskId(taskId);
-    setMoveModalVisible(true);
-  };
-
-  const moveTask = async (newBoardId) => {
+  const moveTaskHandler = async (newBoardId) => {
     try {
       const taskRef = doc(db, 'tasks', selectedTaskId);
       await updateDoc(taskRef, {
@@ -157,6 +179,11 @@ export default function CalendarScreen() {
     }
   };
 
+  const openMoveModal = (taskId) => {
+    setSelectedTaskId(taskId);
+    setMoveModalVisible(true);
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -165,18 +192,35 @@ export default function CalendarScreen() {
     );
   }
 
+  // Budowanie markedDates z wieloma kropkami o różnych kolorach
+  const markedDatesWithDots = {};
+
+  tasks.forEach(task => {
+    if (!markedDatesWithDots[task.deadline]) {
+      markedDatesWithDots[task.deadline] = { dots: [] };
+    }
+    markedDatesWithDots[task.deadline].dots.push({ color: task.color });
+  });
+
+  // Dodanie dzisiejszej daty
+  const today = new Date().toISOString().split('T')[0];
+  if (!markedDatesWithDots[today]) {
+    markedDatesWithDots[today] = {};
+  }
+  markedDatesWithDots[today].selected = true;
+  markedDatesWithDots[today].selectedColor = colors.primary;
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <Calendar
         onDayPress={onDayPress}
-        markedDates={markedDates}
         markingType={'multi-dot'}
-        style={styles.calendar}
+        markedDates={markedDatesWithDots}
         theme={{
           selectedDayBackgroundColor: colors.primary,
           todayTextColor: colors.primary,
           dotColor: colors.primary,
-          selectedDotColor: colors.accent,
+          selectedDotColor: colors.accent || colors.primary, // Upewnij się, że colors.accent istnieje
           agendaDayTextColor: colors.text,
           agendaKnobColor: colors.primary,
           backgroundColor: colors.background,
@@ -187,23 +231,40 @@ export default function CalendarScreen() {
           selectedDayTextColor: colors.background,
           monthTextColor: colors.text,
         }}
+        style={styles.calendar}
       />
 
-      <FlatList
-        data={tasks[selectedDate] || []}
-        renderItem={({ item }) => (
-          <TaskItem 
-            item={item} 
-            onPress={() => navigation.navigate('TaskModal', { taskId: item.id })}
-          />
-        )}
-        keyExtractor={(item) => item.id}
-        ListEmptyComponent={
-          <View style={styles.emptyDate}>
+      {selectedDate && (
+        <View style={styles.tasksContainer}>
+          <Text style={[styles.dateText, { color: colors.text }]}>
+            Zadania na {selectedDate}:
+          </Text>
+          {tasksForSelectedDate.length === 0 ? (
             <Text style={{ color: colors.text }}>Brak zadań na ten dzień.</Text>
-          </View>
-        }
-      />
+          ) : (
+            <FlatList
+              data={tasksForSelectedDate}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <View style={[styles.taskCard, { borderLeftColor: item.color }]}>
+                  <View style={styles.taskHeader}>
+                    <Text style={[styles.taskName, { color: colors.text }]}>{item.name}</Text>
+                    <TouchableOpacity onPress={() => openMoveModal(item.id)}>
+                      <Text style={[styles.moveText, { color: colors.primary }]}>Przenieś</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={[styles.taskDescription, { color: colors.text }]}>
+                    {item.description || 'Brak opisu.'}
+                  </Text>
+                  <Text style={[styles.boardName, { color: colors.text }]}>
+                    Tablica: {item.boardName}
+                  </Text>
+                </View>
+              )}
+            />
+          )}
+        </View>
+      )}
 
       <FAB
         style={styles.fab}
@@ -213,6 +274,7 @@ export default function CalendarScreen() {
         label="Dodaj Zadanie"
       />
 
+      {/* Modal for moving task */}
       <Portal>
         <Modal 
           visible={moveModalVisible} 
@@ -227,7 +289,7 @@ export default function CalendarScreen() {
                 key={item.id}
                 title={item.name}
                 left={() => <List.Icon icon="folder" color={item.color || colors.primary} />}
-                onPress={() => moveTask(item.id)}
+                onPress={() => moveTaskHandler(item.id)}
               />
             )}
             keyExtractor={(item) => item.id}
@@ -246,17 +308,51 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  loadingContainer: {
+    flex:1,
+    justifyContent:'center',
+    alignItems:'center',
+  },
   calendar: {
-    margin: 10,
+    marginBottom: 10,
   },
-  taskItem: {
+  tasksContainer: {
+    flex: 1,
     padding: 10,
-    marginVertical: 4,
-    marginHorizontal: 10,
-    borderRadius: 8,
   },
-  taskText: {
-    color: '#fff',
+  dateText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  taskCard: {
+    backgroundColor: '#f9f9f9',
+    borderLeftWidth: 5,
+    padding: 10,
+    marginBottom: 10,
+    borderRadius: 5,
+  },
+  taskHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  taskName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  moveText: {
+    fontSize: 14,
+    color: '#0366d6',
+  },
+  taskDescription: {
+    fontSize: 14,
+    marginTop: 5,
+  },
+  boardName: {
+    fontSize: 12,
+    marginTop: 5,
+    fontStyle: 'italic',
   },
   fab: {
     position: 'absolute',
@@ -279,15 +375,4 @@ const styles = StyleSheet.create({
   modalButton: {
     marginTop: 10,
   },
-  emptyDate: {
-    flex: 1,
-    padding: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingContainer: {
-    flex:1,
-    justifyContent:'center',
-    alignItems:'center',
-  }
 });
