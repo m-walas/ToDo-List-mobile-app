@@ -1,5 +1,4 @@
 // src/screens/LoginScreen.js
-
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Alert, TextInput, TouchableOpacity, Image } from 'react-native';
 import { Button, Text, useTheme } from 'react-native-paper';
@@ -66,9 +65,8 @@ export default function LoginScreen({ navigation }) {
       if (data.access_token) {
         await AsyncStorage.setItem('githubAccessToken', data.access_token);
 
-        // Fetch user data if needed
         Alert.alert('Sukces', 'Zalogowano przez GitHub!');
-        navigation.navigate('Main');
+        // Nie nawigujemy ręcznie do Main, App.js zrobi to sam gdy user będzie zalogowany
       } else {
         Alert.alert('Błąd', 'Nie udało się uzyskać tokenu dostępu.');
       }
@@ -81,7 +79,7 @@ export default function LoginScreen({ navigation }) {
   const loginUser = () => {
     signInWithEmailAndPassword(auth, email, password)
       .then(() => {
-        navigation.navigate('Main');
+        // Po zalogowaniu user się zmieni, App.js przełączy na Main
       })
       .catch((error) => alert(error.message));
   };

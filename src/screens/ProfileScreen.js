@@ -1,10 +1,8 @@
 // src/screens/ProfileScreen.js
-
 import React, { useContext, useState, useEffect } from 'react';
 import { View, StyleSheet, Alert } from 'react-native';
 import { Text, Button, Avatar, useTheme, TextInput } from 'react-native-paper';
 import { auth, db, storage } from '../firebase';
-import { useNavigation } from '@react-navigation/native';
 import ThemeContext from '../contexts/ThemeContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -13,7 +11,6 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 export default function ProfileScreen() {
   const { colors } = useTheme();
-  const navigation = useNavigation();
   const { isDarkTheme, toggleTheme } = useContext(ThemeContext);
 
   const [name, setName] = useState('');
@@ -21,6 +18,7 @@ export default function ProfileScreen() {
   const [avatar, setAvatar] = useState(null);
 
   useEffect(() => {
+    if (!auth.currentUser) return;
     const fetchUserProfile = async () => {
       try {
         const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
@@ -87,7 +85,16 @@ export default function ProfileScreen() {
       'Czy na pewno chcesz się wylogować?',
       [
         { text: 'Anuluj', style: 'cancel' },
-        { text: 'Wyloguj się', onPress: () => auth.signOut() },
+        {
+          text: 'Wyloguj się',
+          onPress: () => {
+            auth.signOut()
+              .catch((error) => {
+                console.error('Error signing out:', error);
+                Alert.alert('Błąd', 'Nie udało się wylogować.');
+              });
+          },
+        },
       ],
       { cancelable: true }
     );

@@ -1,5 +1,4 @@
 // src/screens/RegisterScreen.js
-
 import React, { useState } from 'react';
 import { TextInput, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native';
 import { Button, Text, useTheme } from 'react-native-paper';
@@ -16,7 +15,7 @@ export default function RegisterScreen({ navigation }) {
     createUserWithEmailAndPassword(auth, email, password)
       .then(() => {
         Alert.alert('Sukces', 'Rejestracja powiodła się!');
-        navigation.navigate('Main');
+        // Po zmianie user, App.js przełączy na Main
       })
       .catch((error) => alert(error.message));
   };

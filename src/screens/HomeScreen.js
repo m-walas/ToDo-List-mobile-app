@@ -1,5 +1,4 @@
 // src/screens/HomeScreen.js
-
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, Image, Dimensions, Alert } from 'react-native';
 import { Text, Button, useTheme, TextInput, Portal, Dialog, FAB, Provider } from 'react-native-paper';
@@ -11,14 +10,24 @@ import { Picker } from '@react-native-picker/picker';
 export default function HomeScreen() {
   const { colors } = useTheme();
   const navigation = useNavigation();
+
+  // Sprawdzamy czy użytkownik jest zalogowany zanim cokolwiek zrobimy
+  if (!auth.currentUser) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent:'center', alignItems:'center' }]}>
+        <Text style={{color: colors.text}}>Ładowanie...</Text>
+      </View>
+    );
+  }
+
   const [boards, setBoards] = useState([]);
   const [fabOpen, setFabOpen] = useState(false);
-
   const [addTaskDialogVisible, setAddTaskDialogVisible] = useState(false);
   const [newTaskText, setNewTaskText] = useState('');
   const [newTaskBoard, setNewTaskBoard] = useState('');
 
   useEffect(() => {
+    if (!auth.currentUser) return;
     const boardsRef = collection(db, 'boards');
     const q = query(boardsRef, where('userId', '==', auth.currentUser.uid));
 
@@ -28,10 +37,15 @@ export default function HomeScreen() {
         fetchedBoards.push({ id: doc.id, ...doc.data() });
       });
       setBoards(fetchedBoards);
+    }, (error) => {
+      console.error('Error fetching boards:', error);
+      Alert.alert('Błąd', 'Nie udało się pobrać tablic. Sprawdź uprawnienia.');
     });
 
-    return unsubscribe;
-  }, []);
+    return () => {
+      unsubscribe();
+    };
+  }, [auth.currentUser]);
 
   const addBoard = () => {
     navigation.navigate('CreateBoardScreen');
@@ -136,6 +150,7 @@ export default function HomeScreen() {
           onStateChange={onStateChange}
           onPress={() => {
             if (fabOpen) {
+              // nic nie rób
             }
           }}
           fabStyle={{ backgroundColor: colors.primary }}

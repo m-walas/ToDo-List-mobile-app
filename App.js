@@ -82,12 +82,11 @@ export default function App() {
     colors: {
       ...NavigationDarkTheme.colors,
       ...PaperDarkTheme.colors,
-      background: '#121212', // Ciemniejsze tło
-      text: '#FFFFFF', // Jasny tekst
-      primary: '#BB86FC', // Jasny kolor akcentujący
-      accent: '#03DAC6', // Jasny kolor akcentujący
-      surface: '#1E1E1E', // Ciemniejsze powierzchnie
-      // Dodaj więcej kolorów w razie potrzeby
+      background: '#121212',
+      text: '#FFFFFF',
+      primary: '#BB86FC',
+      accent: '#03DAC6',
+      surface: '#1E1E1E',
     },
   };
 

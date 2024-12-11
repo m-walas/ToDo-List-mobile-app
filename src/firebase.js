@@ -1,13 +1,12 @@
 // src/firebase.js
-
 import { initializeApp } from 'firebase/app';
 import {
   getReactNativePersistence,
   initializeAuth,
-  getAuth,
+  onAuthStateChanged,
 } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 import {
@@ -35,7 +34,26 @@ const auth = initializeAuth(app, {
 });
 
 const db = getFirestore(app);
-
 const storage = getStorage(app);
+
+const createUserProfile = async (user) => {
+  const userDocRef = doc(db, 'users', user.uid);
+  const userDoc = await getDoc(userDocRef);
+  if (!userDoc.exists()) {
+    await setDoc(userDocRef, {
+      name: user.displayName || '',
+      surname: '',
+      avatar: null,
+      userId: user.uid,
+      createdAt: new Date(),
+    });
+  }
+};
+
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    await createUserProfile(user);
+  }
+});
 
 export { auth, db, storage };

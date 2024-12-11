@@ -1,5 +1,4 @@
 // src/navigation/MainTabNavigator.js
-
 import React, { useState, useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import GitHubTasksScreen from '../screens/GitHubTasksScreen';
@@ -24,14 +23,12 @@ export default function MainTabNavigator() {
 
   useEffect(() => {
     const fetchAvatar = async () => {
-      try {
+      if (auth.currentUser) {
         const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
         if (userDoc.exists()) {
           const userData = userDoc.data();
           setAvatar(userData.avatar);
         }
-      } catch (error) {
-        console.error('Error fetching avatar:', error);
       }
     };
     fetchAvatar();

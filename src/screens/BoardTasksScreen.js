@@ -1,5 +1,4 @@
 // src/screens/BoardTasksScreen.js
-
 import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, Alert, Platform, UIManager, LayoutAnimation } from 'react-native';
 import { Text, IconButton, useTheme, FAB, Menu, Portal, Button, List, TextInput, Modal } from 'react-native-paper';
@@ -8,7 +7,6 @@ import { auth, db } from '../firebase';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/colors';
-
 
 if (
   Platform.OS === 'android' &&
@@ -22,6 +20,15 @@ export default function BoardTasksScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const { boardId } = route.params;
+
+  // Sprawdź czy user jest zalogowany
+  if (!auth.currentUser) {
+    return (
+      <View style={{ flex:1, justifyContent:'center', alignItems:'center', backgroundColor: colors.background }}>
+        <Text style={{color: colors.text}}>Ładowanie...</Text>
+      </View>
+    );
+  }
 
   const [tasks, setTasks] = useState([]);
   const [board, setBoard] = useState(null);
@@ -41,6 +48,8 @@ export default function BoardTasksScreen() {
   const [showCompleted, setShowCompleted] = useState(false);
 
   useEffect(() => {
+    if (!auth.currentUser) return;
+
     const boardRef = doc(db, 'boards', boardId);
     const unsubscribeBoard = onSnapshot(boardRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -49,12 +58,12 @@ export default function BoardTasksScreen() {
     });
 
     const tasksRef = collection(db, 'tasks');
-    const q = query(tasksRef, where('boardId', '==', boardId));
+    const q = query(tasksRef, where('boardId', '==', boardId), where('userId', '==', auth.currentUser.uid));
 
     const unsubscribeTasks = onSnapshot(q, (querySnapshot) => {
       const fetchedTasks = [];
-      querySnapshot.forEach((doc) => {
-        fetchedTasks.push({ id: doc.id, ...doc.data() });
+      querySnapshot.forEach((d) => {
+        fetchedTasks.push({ id: d.id, ...d.data() });
       });
       const sortedTasks = fetchedTasks.sort((a, b) => {
         if (a.isPrioritized === b.isPrioritized) {
@@ -84,7 +93,7 @@ export default function BoardTasksScreen() {
       unsubscribeTasks();
       unsubscribeBoards();
     };
-  }, [boardId]);
+  }, [boardId, auth.currentUser]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -132,11 +141,11 @@ export default function BoardTasksScreen() {
                         await deleteDoc(doc(db, 'boards', boardId));
 
                         const tasksRef = collection(db, 'tasks');
-                        const q = query(tasksRef, where('boardId', '==', boardId));
+                        const q = query(tasksRef, where('boardId', '==', boardId), where('userId', '==', auth.currentUser.uid));
                         const querySnapshot = await getDocs(q);
                         const batch = writeBatch(db);
-                        querySnapshot.forEach((doc) => {
-                          batch.delete(doc.ref);
+                        querySnapshot.forEach((d) => {
+                          batch.delete(d.ref);
                         });
                         await batch.commit();
 
@@ -335,18 +344,6 @@ export default function BoardTasksScreen() {
     setShowCompleted(!showCompleted);
   };
 
-  const renderColorOption = ({ item }) => (
-    <TouchableOpacity
-      style={[styles.colorOption, { backgroundColor: item }]}
-      onPress={() => {
-        setNewBoardColor(item);
-        setEditColorModalVisible(false);
-      }}
-    >
-      {newBoardColor === item && <View style={styles.selectedIndicator} />}
-    </TouchableOpacity>
-  );
-
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
@@ -456,7 +453,25 @@ export default function BoardTasksScreen() {
           <Text style={styles.modalTitle}>Zmień Kolor Tablicy</Text>
           <FlatList
             data={COLORS}
-            renderItem={renderColorOption}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[styles.colorOption, { backgroundColor: item }]}
+                onPress={async () => {
+                  try {
+                    const boardRef = doc(db, 'boards', boardId);
+                    await updateDoc(boardRef, { color: item });
+                    setNewBoardColor(item);
+                    setEditColorModalVisible(false);
+                    Alert.alert('Sukces', 'Kolor tablicy został zaktualizowany.');
+                  } catch (error) {
+                    console.error('Error updating board color:', error);
+                    Alert.alert('Błąd', 'Nie udało się zaktualizować koloru tablicy.');
+                  }
+                }}
+              >
+                {newBoardColor === item && <View style={styles.selectedIndicator} />}
+              </TouchableOpacity>
+            )}
             keyExtractor={(item) => item}
             numColumns={4}
             contentContainerStyle={styles.colorsContainer}

@@ -1,20 +1,20 @@
 // src/screens/AddTaskScreen.js
-
 import React, { useState } from 'react';
 import { View, StyleSheet, Alert, Platform } from 'react-native';
 import { Text, TextInput, Button, useTheme } from 'react-native-paper';
 import { collection, addDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function AddTaskScreen({ route, navigation }) {
   const { colors } = useTheme();
-  const { boardId } = route.params;
+  const { boardId } = route.params; // Upewnij się, że to jest przekazywane w navigation.navigate(...)
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [deadline, setDeadline] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  
+
   const createTask = async () => {
     if (title.trim() === '') {
       Alert.alert('Błąd', 'Proszę podać tytuł zadania.');
@@ -22,7 +22,12 @@ export default function AddTaskScreen({ route, navigation }) {
     }
 
     if (!boardId) {
-      Alert.alert('Błąd', 'Brak wybranej tablicy. Proszę wybrać tablicę dla zadania.');
+      Alert.alert('Błąd', 'Brak wybranej tablicy. Przejdź z ekranu tablicy, aby wybrać tablicę.');
+      return;
+    }
+
+    if (!auth.currentUser) {
+      Alert.alert('Błąd', 'Użytkownik nie jest zalogowany.');
       return;
     }
 
@@ -55,7 +60,7 @@ export default function AddTaskScreen({ route, navigation }) {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <Text style={[styles.label, { color: colors.text }]}>Tytuł Zadania</Text>
       <TextInput
         style={[styles.input, { color: colors.text, borderColor: colors.primary }]}
@@ -100,7 +105,7 @@ export default function AddTaskScreen({ route, navigation }) {
       >
         Dodaj Zadanie
       </Button>
-    </View>
+    </SafeAreaView>
   );
 }
 

@@ -1,5 +1,4 @@
 // src/screens/CreateBoardScreen.js
-
 import React, { useState } from 'react';
 import { View, StyleSheet, Image, TouchableOpacity, Alert, FlatList } from 'react-native';
 import { Text, TextInput, Button, useTheme, Dialog, Portal } from 'react-native-paper';
@@ -33,6 +32,11 @@ export default function CreateBoardScreen({ navigation }) {
   const createBoard = async () => {
     if (name.trim() === '') {
       Alert.alert('Błąd', 'Proszę podać nazwę tablicy.');
+      return;
+    }
+
+    if (!auth.currentUser) {
+      Alert.alert('Błąd', 'Użytkownik nie jest zalogowany.');
       return;
     }
 
