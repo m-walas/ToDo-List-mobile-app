@@ -8,10 +8,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/colors';
 
-if (
-  Platform.OS === 'android' &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
@@ -20,15 +17,6 @@ export default function BoardTasksScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const { boardId } = route.params;
-
-  // Sprawdź czy user jest zalogowany
-  if (!auth.currentUser) {
-    return (
-      <View style={{ flex:1, justifyContent:'center', alignItems:'center', backgroundColor: colors.background }}>
-        <Text style={{color: colors.text}}>Ładowanie...</Text>
-      </View>
-    );
-  }
 
   const [tasks, setTasks] = useState([]);
   const [board, setBoard] = useState(null);
@@ -44,56 +32,103 @@ export default function BoardTasksScreen() {
   const [newBoardColor, setNewBoardColor] = useState('');
 
   const [moveModalVisible, setMoveModalVisible] = useState(false);
-
   const [showCompleted, setShowCompleted] = useState(false);
 
+  // Stan użytkownika
+  const [user, setUser] = useState(auth.currentUser);
+
+  // Śledzenie zmian uwierzytelnienia
   useEffect(() => {
-    if (!auth.currentUser) return;
+    const unsubscribeAuth = auth.onAuthStateChanged((currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribeAuth();
+  }, []);
 
+  // Nasłuch Firestore tylko jeśli user jest zalogowany
+  useEffect(() => {
+    if (!user) return; // Bez zalogowanego użytkownika brak nasłuchów
+
+    // Nasłuch na dokument tablicy
     const boardRef = doc(db, 'boards', boardId);
-    const unsubscribeBoard = onSnapshot(boardRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setBoard(docSnap.data());
-      }
-    });
-
-    const tasksRef = collection(db, 'tasks');
-    const q = query(tasksRef, where('boardId', '==', boardId), where('userId', '==', auth.currentUser.uid));
-
-    const unsubscribeTasks = onSnapshot(q, (querySnapshot) => {
-      const fetchedTasks = [];
-      querySnapshot.forEach((d) => {
-        fetchedTasks.push({ id: d.id, ...d.data() });
-      });
-      const sortedTasks = fetchedTasks.sort((a, b) => {
-        if (a.isPrioritized === b.isPrioritized) {
-          if (a.isCompleted === b.isCompleted) {
-            return 0;
-          }
-          return a.isCompleted ? 1 : -1;
+    const unsubscribeBoard = onSnapshot(
+      boardRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          setBoard(docSnap.data());
+        } else {
+          navigation.goBack();
         }
-        return a.isPrioritized ? -1 : 1;
-      });
-      setTasks(sortedTasks);
-    });
+      },
+      (error) => {
+        console.error('Error in board snapshot:', error);
+        if (error.code === 'permission-denied') {
+          Alert.alert('Błąd', 'Nie masz uprawnień do tego zasobu.');
+        } else {
+          Alert.alert('Błąd', 'Wystąpił problem podczas pobierania tablicy.');
+        }
+      }
+    );
 
+    // Nasłuch na kolekcję zadań
+    const tasksRef = collection(db, 'tasks');
+    const qTasks = query(tasksRef, where('boardId', '==', boardId), where('userId', '==', user.uid));
+    const unsubscribeTasks = onSnapshot(
+      qTasks,
+      (querySnapshot) => {
+        const fetchedTasks = [];
+        querySnapshot.forEach((d) => {
+          fetchedTasks.push({ id: d.id, ...d.data() });
+        });
+        const sortedTasks = fetchedTasks.sort((a, b) => {
+          if (a.isPrioritized === b.isPrioritized) {
+            if (a.isCompleted === b.isCompleted) {
+              return 0;
+            }
+            return a.isCompleted ? 1 : -1;
+          }
+          return a.isPrioritized ? -1 : 1;
+        });
+        setTasks(sortedTasks);
+      },
+      (error) => {
+        console.error('Error in tasks snapshot:', error);
+        if (error.code === 'permission-denied') {
+          Alert.alert('Błąd', 'Nie masz uprawnień do tego zasobu.');
+        } else {
+          Alert.alert('Błąd', 'Wystąpił problem podczas pobierania zadań.');
+        }
+      }
+    );
+
+    // Nasłuch na tablice użytkownika (do przenoszenia zadań)
     const boardsRef = collection(db, 'boards');
-    const qBoards = query(boardsRef, where('userId', '==', auth.currentUser.uid));
-
-    const unsubscribeBoards = onSnapshot(qBoards, (querySnapshot) => {
-      const fetchedBoards = [];
-      querySnapshot.forEach((doc) => {
-        fetchedBoards.push({ id: doc.id, ...doc.data() });
-      });
-      setBoards(fetchedBoards);
-    });
+    const qBoards = query(boardsRef, where('userId', '==', user.uid));
+    const unsubscribeBoards = onSnapshot(
+      qBoards,
+      (querySnapshot) => {
+        const fetchedBoards = [];
+        querySnapshot.forEach((doc) => {
+          fetchedBoards.push({ id: doc.id, ...doc.data() });
+        });
+        setBoards(fetchedBoards);
+      },
+      (error) => {
+        console.error('Error in boards snapshot:', error);
+        if (error.code === 'permission-denied') {
+          Alert.alert('Błąd', 'Nie masz uprawnień do tego zasobu.');
+        } else {
+          Alert.alert('Błąd', 'Wystąpił problem podczas pobierania tablic.');
+        }
+      }
+    );
 
     return () => {
       unsubscribeBoard();
       unsubscribeTasks();
       unsubscribeBoards();
     };
-  }, [boardId, auth.currentUser]);
+  }, [user, boardId, navigation]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -137,11 +172,12 @@ export default function BoardTasksScreen() {
                     text: 'Usuń',
                     style: 'destructive',
                     onPress: async () => {
+                      if (!user) return;
                       try {
                         await deleteDoc(doc(db, 'boards', boardId));
 
                         const tasksRef = collection(db, 'tasks');
-                        const q = query(tasksRef, where('boardId', '==', boardId), where('userId', '==', auth.currentUser.uid));
+                        const q = query(tasksRef, where('boardId', '==', boardId), where('userId', '==', user.uid));
                         const querySnapshot = await getDocs(q);
                         const batch = writeBatch(db);
                         querySnapshot.forEach((d) => {
@@ -149,7 +185,11 @@ export default function BoardTasksScreen() {
                         });
                         await batch.commit();
 
-                        navigation.goBack();
+                        if (navigation.canGoBack()) {
+                          navigation.goBack();
+                        } else {
+                          navigation.navigate('HomeScreen');
+                        }
                         Alert.alert('Sukces', 'Tablica została usunięta.');
                       } catch (error) {
                         console.error('Error deleting board:', error);
@@ -167,7 +207,15 @@ export default function BoardTasksScreen() {
       ),
       headerTitle: board ? board.name : 'Tablica',
     });
-  }, [navigation, menuVisibleHeader, board]);
+  }, [navigation, menuVisibleHeader, board, user]);
+
+  if (!user) {
+    return (
+      <View style={{ flex:1, justifyContent:'center', alignItems:'center', backgroundColor: colors.background }}>
+        <Text style={{color: colors.text}}>Ładowanie...</Text>
+      </View>
+    );
+  }
 
   const toggleTaskCompletion = async (taskId, currentStatus) => {
     try {
@@ -177,6 +225,7 @@ export default function BoardTasksScreen() {
       });
     } catch (error) {
       console.error('Error updating task:', error);
+      Alert.alert('Błąd', 'Nie udało się zaktualizować zadania.');
     }
   };
 
@@ -188,6 +237,7 @@ export default function BoardTasksScreen() {
       });
     } catch (error) {
       console.error('Error prioritizing task:', error);
+      Alert.alert('Błąd', 'Nie udało się zaktualizować priorytetu zadania.');
     }
   };
 
@@ -195,8 +245,10 @@ export default function BoardTasksScreen() {
     try {
       const taskRef = doc(db, 'tasks', taskId);
       await deleteDoc(taskRef);
+      Alert.alert('Sukces', 'Zadanie zostało usunięte.');
     } catch (error) {
       console.error('Error deleting task:', error);
+      Alert.alert('Błąd', 'Nie udało się usunąć zadania.');
     }
   };
 

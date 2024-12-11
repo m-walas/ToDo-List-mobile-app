@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function AddTaskScreen({ route, navigation }) {
   const { colors } = useTheme();
-  const { boardId } = route.params; // Upewnij się, że to jest przekazywane w navigation.navigate(...)
+  const { boardId } = route.params;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [deadline, setDeadline] = useState(null);

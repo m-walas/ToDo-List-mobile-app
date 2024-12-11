@@ -22,6 +22,7 @@ export default function MainTabNavigator() {
   const [avatar, setAvatar] = useState(null);
 
   useEffect(() => {
+    if (!auth.currentUser) return;
     const fetchAvatar = async () => {
       if (auth.currentUser) {
         const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));

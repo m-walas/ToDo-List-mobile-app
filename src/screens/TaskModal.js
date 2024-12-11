@@ -12,18 +12,18 @@ export default function TaskModal({ route, navigation }) {
   const { colors } = useTheme();
   const { taskId } = route.params;
 
-  if (!taskId) {
-    Alert.alert('Błąd', 'Brak identyfikatora zadania.');
-    navigation.goBack();
-    return null;
-  }
-
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [deadline, setDeadline] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedBoard, setSelectedBoard] = useState('');
   const [boards, setBoards] = useState([]);
+
+  if (!taskId) {
+    Alert.alert('Błąd', 'Brak identyfikatora zadania.');
+    navigation.goBack();
+    return null;
+  }
 
   useEffect(() => {
     const taskRef = doc(db, 'tasks', taskId);
@@ -49,7 +49,12 @@ export default function TaskModal({ route, navigation }) {
         fetchedBoards.push({ id: doc.id, ...doc.data() });
       });
       setBoards(fetchedBoards);
-    });
+    },
+    error => {
+      console.error('Error fetching boards:', error);
+      Alert.alert('Błąd', 'Nie udało się pobrać tablic.');
+    }
+  );
 
     return () => {
       unsubscribeTask();

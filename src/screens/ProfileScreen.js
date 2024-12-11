@@ -8,10 +8,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { UnsubContext } from '../contexts/UnsubContext';
 
 export default function ProfileScreen() {
   const { colors } = useTheme();
-  const { isDarkTheme, toggleTheme } = useContext(ThemeContext);
+  const { isDarkTheme, toggleTheme } = React.useContext(ThemeContext);
+  const { clearUnsubs } = React.useContext(UnsubContext);
 
   const [name, setName] = useState('');
   const [surname, setSurname] = useState('');
@@ -87,12 +89,13 @@ export default function ProfileScreen() {
         { text: 'Anuluj', style: 'cancel' },
         {
           text: 'Wyloguj się',
-          onPress: () => {
-            auth.signOut()
-              .catch((error) => {
-                console.error('Error signing out:', error);
-                Alert.alert('Błąd', 'Nie udało się wylogować.');
-              });
+          onPress: async () => {
+            try {
+              clearUnsubs();
+              await auth.signOut();
+            } catch (error) {
+              console.error('Error signing out:', error);
+            }
           },
         },
       ],

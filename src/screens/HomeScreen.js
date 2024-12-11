@@ -1,24 +1,17 @@
 // src/screens/HomeScreen.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, Image, Dimensions, Alert } from 'react-native';
 import { Text, Button, useTheme, TextInput, Portal, Dialog, FAB, Provider } from 'react-native-paper';
 import { collection, addDoc, query, where, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { useNavigation } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
+import { UnsubContext } from '../contexts/UnsubContext';
 
 export default function HomeScreen() {
   const { colors } = useTheme();
   const navigation = useNavigation();
-
-  // Sprawdzamy czy użytkownik jest zalogowany zanim cokolwiek zrobimy
-  if (!auth.currentUser) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background, justifyContent:'center', alignItems:'center' }]}>
-        <Text style={{color: colors.text}}>Ładowanie...</Text>
-      </View>
-    );
-  }
+  const { addUnsub, removeUnsub } = useContext(UnsubContext);
 
   const [boards, setBoards] = useState([]);
   const [fabOpen, setFabOpen] = useState(false);
@@ -26,26 +19,44 @@ export default function HomeScreen() {
   const [newTaskText, setNewTaskText] = useState('');
   const [newTaskBoard, setNewTaskBoard] = useState('');
 
-  useEffect(() => {
-    if (!auth.currentUser) return;
-    const boardsRef = collection(db, 'boards');
-    const q = query(boardsRef, where('userId', '==', auth.currentUser.uid));
+  const user = auth.currentUser;
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const fetchedBoards = [];
-      querySnapshot.forEach((doc) => {
-        fetchedBoards.push({ id: doc.id, ...doc.data() });
-      });
-      setBoards(fetchedBoards);
-    }, (error) => {
-      console.error('Error fetching boards:', error);
-      Alert.alert('Błąd', 'Nie udało się pobrać tablic. Sprawdź uprawnienia.');
-    });
+  useEffect(() => {
+    if (!user) return;
+
+    const boardsRef = collection(db, 'boards');
+    const q = query(boardsRef, where('userId', '==', user.uid));
+
+    const unsubscribe = onSnapshot(q,
+      (querySnapshot) => {
+        const fetchedBoards = [];
+        querySnapshot.forEach((doc) => {
+          fetchedBoards.push({ id: doc.id, ...doc.data() });
+        });
+        setBoards(fetchedBoards);
+      },
+      (error) => {
+        console.error('Error fetching boards:', error);
+        unsubscribe();
+        removeUnsub(unsubscribe);
+      }
+    );
+
+    addUnsub(unsubscribe);
 
     return () => {
+      removeUnsub(unsubscribe);
       unsubscribe();
     };
-  }, [auth.currentUser]);
+  }, [user]);
+
+  if (!user) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: colors.text }}>Ładowanie...</Text>
+      </View>
+    );
+  }
 
   const addBoard = () => {
     navigation.navigate('CreateBoardScreen');
@@ -87,7 +98,7 @@ export default function HomeScreen() {
     try {
       await addDoc(collection(db, 'tasks'), {
         text: newTaskText,
-        userId: auth.currentUser.uid,
+        userId: user.uid,
         boardId: newTaskBoard,
         isCompleted: false,
         isPrioritized: false,
@@ -150,7 +161,7 @@ export default function HomeScreen() {
           onStateChange={onStateChange}
           onPress={() => {
             if (fabOpen) {
-              // nic nie rób
+              // nic
             }
           }}
           fabStyle={{ backgroundColor: colors.primary }}

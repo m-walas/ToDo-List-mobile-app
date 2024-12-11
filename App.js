@@ -24,6 +24,9 @@ import { useColorScheme } from 'react-native';
 
 import ThemeContext from './src/contexts/ThemeContext';
 
+// Importujemy UnsubProvider
+import { UnsubProvider } from './src/contexts/UnsubContext';
+
 const Stack = createStackNavigator();
 
 export default function App() {
@@ -93,21 +96,23 @@ export default function App() {
   const theme = isDarkTheme ? CustomDarkTheme : CustomDefaultTheme;
 
   return (
-    <ThemeContext.Provider value={{ isDarkTheme, toggleTheme }}>
-      <PaperProvider theme={theme}>
-        <NavigationContainer theme={theme}>
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-            {user ? (
-              <Stack.Screen name="Main" component={AppNavigator} />
-            ) : (
-              <>
-                <Stack.Screen name="Login" component={LoginScreen} />
-                <Stack.Screen name="Register" component={RegisterScreen} />
-              </>
-            )}
-          </Stack.Navigator>
-        </NavigationContainer>
-      </PaperProvider>
-    </ThemeContext.Provider>
+    <UnsubProvider>
+      <ThemeContext.Provider value={{ isDarkTheme, toggleTheme }}>
+        <PaperProvider theme={theme}>
+          <NavigationContainer theme={theme}>
+            <Stack.Navigator screenOptions={{ headerShown: false }}>
+              {user ? (
+                <Stack.Screen name="Main" component={AppNavigator} />
+              ) : (
+                <>
+                  <Stack.Screen name="Login" component={LoginScreen} />
+                  <Stack.Screen name="Register" component={RegisterScreen} />
+                </>
+              )}
+            </Stack.Navigator>
+          </NavigationContainer>
+        </PaperProvider>
+      </ThemeContext.Provider>
+    </UnsubProvider>
   );
 }
