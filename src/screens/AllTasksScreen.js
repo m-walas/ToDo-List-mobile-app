@@ -226,7 +226,7 @@ export default function AllTasksScreen() {
             toggleCompletion={toggleTaskCompletion} 
             navigateToTask={(id) => navigation.navigate('TaskModal', { taskId: id })}
             openMenu={openMenu}
-            openMoveModal={openMoveModal} // Dodano funkcję
+            openMoveModal={openMoveModal}
             prioritize={prioritizeTask}
           />
         )}
@@ -300,7 +300,7 @@ export default function AllTasksScreen() {
             <Button
               onPress={() => {
                 if (selectedBoard) {
-                  moveTask(selectedTaskId, selectedBoard); // Przenieś zadanie
+                  moveTask(selectedTaskId, selectedBoard);
                 } else {
                   Alert.alert('Błąd', 'Proszę wybrać tablicę.');
                 }

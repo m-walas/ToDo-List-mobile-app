@@ -29,7 +29,7 @@ export default function CreateBoardScreen({ navigation }) {
   
       console.log('Launching image picker...');
       let result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Poprawka tutaj
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 1,
@@ -64,12 +64,12 @@ export default function CreateBoardScreen({ navigation }) {
     if (coverImage) {
       try {
         console.log('Fetching image...');
-        const response = await fetch(coverImage); // Pobierz obraz z lokalnego URI
-        const blob = await response.blob(); // Konwertuj obraz na `blob`
+        const response = await fetch(coverImage);
+        const blob = await response.blob();
         console.log('Uploading image to Firebase Storage...');
         const storageRef = ref(storage, `boardCovers/${auth.currentUser.uid}/${Date.now()}`);
-        await uploadBytes(storageRef, blob); // Prześlij obraz
-        coverImageURL = await getDownloadURL(storageRef); // Pobierz URL obrazu
+        await uploadBytes(storageRef, blob);
+        coverImageURL = await getDownloadURL(storageRef);
         console.log('Image uploaded successfully:', coverImageURL);
       } catch (error) {
         console.error('Error uploading cover image:', error);

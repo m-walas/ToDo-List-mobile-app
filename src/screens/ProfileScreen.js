@@ -40,24 +40,24 @@ export default function ProfileScreen() {
 
   const pickImage = async () => {
     try {
-      console.log('pickImage function called'); // Log wywołania
+      console.log('pickImage function called');
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Użyj MediaTypeOptions, jeśli inne opcje nie działają
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.5,
       });
 
-      console.log('Image picker result:', result); // Log wyniku
+      console.log('Image picker result:', result);
 
       if (!result.canceled) {
-        const selectedImageUri = result.assets[0].uri; // Pobierz URI obrazu
+        const selectedImageUri = result.assets[0].uri;
         console.log('Selected image URI:', selectedImageUri);
         setAvatar(selectedImageUri);
         await uploadAvatar(selectedImageUri);
       }
     } catch (error) {
-      console.error('Error in pickImage:', error); // Log błędu
+      console.error('Error in pickImage:', error);
       Alert.alert('Błąd', 'Nie udało się otworzyć galerii.');
     }
   };
@@ -65,8 +65,8 @@ export default function ProfileScreen() {
   const uploadAvatar = async (uri) => {
     try {
       console.log('Uploading avatar:', uri);
-      const response = await fetch(uri); // Pobierz obraz z URI
-      const blob = await response.blob(); // Konwertuj obraz na blob
+      const response = await fetch(uri);
+      const blob = await response.blob();
       const storageRef = ref(storage, `avatars/${auth.currentUser.uid}`);
       await uploadBytes(storageRef, blob);
       const downloadURL = await getDownloadURL(storageRef);

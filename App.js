@@ -23,7 +23,6 @@ import {
 
 import { ThemeProvider, useThemeContext } from './src/contexts/ThemeContext';
 
-// Importujemy UnsubProvider
 import { UnsubProvider } from './src/contexts/UnsubContext';
 
 const Stack = createStackNavigator();

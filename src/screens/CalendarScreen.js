@@ -52,7 +52,7 @@ LocaleConfig.defaultLocale = 'pl';
 
 export default function CalendarScreen() {
   const { colors } = useTheme();
-  const colorScheme = useColorScheme(); // Hook do wykrywania zmian schematu kolorów
+  const colorScheme = useColorScheme();
   const navigation = useNavigation();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -61,7 +61,7 @@ export default function CalendarScreen() {
   const [moveModalVisible, setMoveModalVisible] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [availableBoards, setAvailableBoards] = useState([]);
-  const [themeVersion, setThemeVersion] = useState(0); // Stan do wymuszenia renderowania
+  const [themeVersion, setThemeVersion] = useState(0);
 
   // console.log('Aktualny motyw:', colors);
 
@@ -98,7 +98,6 @@ export default function CalendarScreen() {
 
       querySnapshot.forEach((docSnap) => {
         const task = docSnap.data();
-        // Filtrujemy tylko niedokończone zadania, posiadające deadline i przypisaną tablicę
         if (!task.deadline || !task.boardId || task.isCompleted) return;
 
         const board = availableBoards.find((b) => b.id === task.boardId);
@@ -142,7 +141,7 @@ export default function CalendarScreen() {
     return () => {
       unsubscribeTasks();
     };
-  }, [availableBoards, colors]); // Upewnij się, że zależności obejmują cały obiekt 'colors'
+  }, [availableBoards, colors]);
 
   // Memoizacja oznaczonych dat
   const markedDates = useMemo(() => {
@@ -165,7 +164,7 @@ export default function CalendarScreen() {
     };
 
     return dates;
-  }, [tasks, colors]); // Upewnij się, że zależności obejmują cały obiekt 'colors'
+  }, [tasks, colors]);
 
   const onDayPress = (day) => {
     setSelectedDate(day.dateString);
@@ -204,7 +203,7 @@ export default function CalendarScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <Calendar
-        key={`${colors.background}-${themeVersion}`} // Dodanie 'themeVersion' do klucza
+        key={`${colors.background}-${themeVersion}`}
         onDayPress={onDayPress}
         markingType={'multi-dot'}
         markedDates={markedDates}
@@ -340,7 +339,6 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 10,
     borderRadius: 5,
-    // backgroundColor oraz borderLeftColor ustalane dynamicznie z motywu i item.color
   },
   taskHeader: {
     flexDirection: 'row',
@@ -353,7 +351,6 @@ const styles = StyleSheet.create({
   },
   moveText: {
     fontSize: 14,
-    // Kolor ustawiany dynamicznie w kodzie
   },
   taskDescription: {
     fontSize: 14,
@@ -369,14 +366,12 @@ const styles = StyleSheet.create({
     margin: 16,
     right: 0,
     bottom: 0,
-    // Tło fab ustawione dynamicznie
   },
   modalContainer: {
     padding: 20,
     margin: 20,
     borderRadius: 8,
     maxHeight: '80%',
-    // backgroundColor ustawione dynamicznie
   },
   modalTitle: {
     fontSize: 18,

@@ -104,7 +104,7 @@ export default function HomeScreen() {
       await addDoc(collection(db, 'tasks'), {
         text: newTaskText,
         description: newTaskDescription,
-        deadline: newTaskDeadline || null, // Dodano deadline
+        deadline: newTaskDeadline || null,
         userId: user.uid,
         boardId: newTaskBoard,
         isCompleted: false,
@@ -114,7 +114,7 @@ export default function HomeScreen() {
       setNewTaskText('');
       setNewTaskBoard('');
       setNewTaskDescription('');
-      setNewTaskDeadline(null); // Zresetuj deadline
+      setNewTaskDeadline(null);
       setAddTaskDialogVisible(false);
       Alert.alert('Sukces', 'Zadanie zostało dodane.');
     } catch (error) {
@@ -221,9 +221,9 @@ export default function HomeScreen() {
                     mode="date"
                     display="default"
                     onChange={(event, selectedDate) => {
-                      setShowDatePicker(false); // Zamknij picker
+                      setShowDatePicker(false);
                       if (selectedDate) {
-                        setNewTaskDeadline(selectedDate); // Zaktualizuj deadline
+                        setNewTaskDeadline(selectedDate);
                       }
                     }}
                   />

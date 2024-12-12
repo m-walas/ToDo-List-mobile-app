@@ -68,7 +68,7 @@ export default function AddTaskScreen({ route, navigation }) {
   };
 
   const onDateChange = (event, selectedDate) => {
-    setShowDatePicker(false); // Zamknij picker
+    setShowDatePicker(false);
     if (selectedDate) {
       setDeadline(selectedDate); // Ustaw wybraną datę jako deadline
     }

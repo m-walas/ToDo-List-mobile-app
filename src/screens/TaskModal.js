@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Alert, Platform, View } from 'react-native';
-import { Button, useTheme, Modal, Portal, TextInput, Text } from 'react-native-paper'; // Dodano Text
+import { Button, useTheme, Modal, Portal, TextInput, Text } from 'react-native-paper';
 import { doc, updateDoc, deleteDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import DateTimePicker from '@react-native-community/datetimepicker';
