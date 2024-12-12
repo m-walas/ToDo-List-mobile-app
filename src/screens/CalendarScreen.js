@@ -1,6 +1,6 @@
-// src/screens/HeatmapCalendarScreen.js
+// src/screens/CalendarScreen.js
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   StyleSheet, 
   ActivityIndicator, 
@@ -30,12 +30,9 @@ import {
 import { auth, db } from '../firebase';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-// Importowanie kolorów z colors.js
-import { COLORS } from '../constants/colors';
-
-// Konfiguracja lokalizacji (opcjonalnie)
 import { LocaleConfig } from 'react-native-calendars';
+import { useColorScheme } from 'react-native';
+
 LocaleConfig.locales['pl'] = {
   monthNames: [
     'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
@@ -53,19 +50,27 @@ LocaleConfig.locales['pl'] = {
 };
 LocaleConfig.defaultLocale = 'pl';
 
-export default function HeatmapCalendarScreen() {
+export default function CalendarScreen() {
   const { colors } = useTheme();
+  const colorScheme = useColorScheme(); // Hook do wykrywania zmian schematu kolorów
   const navigation = useNavigation();
   const [tasks, setTasks] = useState([]);
-  const [markedDates, setMarkedDates] = useState({});
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(null);
   const [tasksForSelectedDate, setTasksForSelectedDate] = useState([]);
   const [moveModalVisible, setMoveModalVisible] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [availableBoards, setAvailableBoards] = useState([]);
+  const [themeVersion, setThemeVersion] = useState(0); // Stan do wymuszenia renderowania
 
-  // Fetch boards (tablice użytkownika)
+  console.log('Aktualny motyw:', colors);
+
+  // Aktualizacja stanu przy zmianie schematu kolorów
+  useEffect(() => {
+    setThemeVersion(prev => prev + 1);
+  }, [colorScheme]);
+
+  // Pobierz tablice użytkownika
   useEffect(() => {
     const boardsRef = collection(db, 'boards');
     const qBoards = query(boardsRef, where('userId', '==', auth.currentUser.uid));
@@ -83,7 +88,7 @@ export default function HeatmapCalendarScreen() {
     };
   }, []);
 
-  // Fetch tasks (zadania użytkownika)
+  // Pobierz zadania użytkownika
   useEffect(() => {
     const tasksRef = collection(db, 'tasks');
     const qTasks = query(tasksRef, where('userId', '==', auth.currentUser.uid));
@@ -93,7 +98,7 @@ export default function HeatmapCalendarScreen() {
 
       querySnapshot.forEach((docSnap) => {
         const task = docSnap.data();
-        // Filtrujemy tylko niedokończone zadania
+        // Filtrujemy tylko niedokończone zadania, posiadające deadline i przypisaną tablicę
         if (!task.deadline || !task.boardId || task.isCompleted) return;
 
         const board = availableBoards.find((b) => b.id === task.boardId);
@@ -102,29 +107,29 @@ export default function HeatmapCalendarScreen() {
         let date;
         try {
           if (typeof task.deadline.toDate === 'function') {
-            // Firestore Timestamp
+            // Timestamp Firestore
             date = task.deadline.toDate().toISOString().split('T')[0];
           } else if (task.deadline instanceof Date) {
             // JavaScript Date
             date = task.deadline.toISOString().split('T')[0];
           } else if (typeof task.deadline === 'string') {
-            // String date
+            // String
             date = new Date(task.deadline).toISOString().split('T')[0];
           } else {
-            throw new Error('Unknown deadline format');
+            throw new Error('Nieznany format daty deadline');
           }
         } catch (error) {
-          console.warn(`Error converting date for task ID: ${docSnap.id}`, error);
+          console.warn(`Błąd przy konwersji daty dla zadania ID: ${docSnap.id}`, error);
           return;
         }
 
         if (date) {
           fetchedTasks.push({
             id: docSnap.id,
-            name: task.text || 'No Name',
+            name: task.text || 'Brak nazwy',
             color: board.color || colors.primary,
             description: task.description || '',
-            boardName: board.name || 'No Board Name',
+            boardName: board.name || 'Brak nazwy tablicy',
             deadline: date
           });
         }
@@ -132,31 +137,35 @@ export default function HeatmapCalendarScreen() {
 
       setTasks(fetchedTasks);
       setLoading(false);
-
-      // Aktualizacja markedDates
-      const dates = {};
-      fetchedTasks.forEach(task => {
-        if (!dates[task.deadline]) {
-          dates[task.deadline] = { dots: [] };
-        }
-        dates[task.deadline].dots.push({ color: task.color });
-      });
-
-      // Dodanie dzisiejszej daty
-      const today = new Date().toISOString().split('T')[0];
-      dates[today] = {
-        ...(dates[today] || {}),
-        selected: true,
-        selectedColor: colors.primary,
-      };
-
-      setMarkedDates(dates);
     });
 
     return () => {
       unsubscribeTasks();
     };
-  }, [availableBoards, colors.primary]);
+  }, [availableBoards, colors]); // Upewnij się, że zależności obejmują cały obiekt 'colors'
+
+  // Memoizacja oznaczonych dat
+  const markedDates = useMemo(() => {
+    const dates = {};
+
+    tasks.forEach(task => {
+      if (!dates[task.deadline]) {
+        dates[task.deadline] = { dots: [] };
+      }
+      dates[task.deadline].dots.push({ color: task.color });
+    });
+
+    // Dzisiejsza data wyróżniona
+    const today = new Date().toISOString().split('T')[0];
+    dates[today] = {
+      ...(dates[today] || {}),
+      selected: true,
+      selectedColor: colors.primary,
+      selectedTextColor: colors.background,
+    };
+
+    return dates;
+  }, [tasks, colors]); // Upewnij się, że zależności obejmują cały obiekt 'colors'
 
   const onDayPress = (day) => {
     setSelectedDate(day.dateString);
@@ -174,7 +183,7 @@ export default function HeatmapCalendarScreen() {
       setSelectedTaskId(null);
       Alert.alert('Sukces', 'Zadanie zostało przeniesione.');
     } catch (error) {
-      console.error('Error moving task:', error);
+      console.error('Błąd przy przenoszeniu zadania:', error);
       Alert.alert('Błąd', 'Nie udało się przenieść zadania.');
     }
   };
@@ -186,50 +195,41 @@ export default function HeatmapCalendarScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
-  // Budowanie markedDates z wieloma kropkami o różnych kolorach
-  const markedDatesWithDots = {};
-
-  tasks.forEach(task => {
-    if (!markedDatesWithDots[task.deadline]) {
-      markedDatesWithDots[task.deadline] = { dots: [] };
-    }
-    markedDatesWithDots[task.deadline].dots.push({ color: task.color });
-  });
-
-  // Dodanie dzisiejszej daty
-  const today = new Date().toISOString().split('T')[0];
-  if (!markedDatesWithDots[today]) {
-    markedDatesWithDots[today] = {};
-  }
-  markedDatesWithDots[today].selected = true;
-  markedDatesWithDots[today].selectedColor = colors.primary;
-
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <Calendar
+        key={`${colors.background}-${themeVersion}`} // Dodanie 'themeVersion' do klucza
         onDayPress={onDayPress}
         markingType={'multi-dot'}
-        markedDates={markedDatesWithDots}
+        markedDates={markedDates}
         theme={{
           selectedDayBackgroundColor: colors.primary,
           todayTextColor: colors.primary,
           dotColor: colors.primary,
-          selectedDotColor: colors.accent || colors.primary, // Upewnij się, że colors.accent istnieje
+          selectedDotColor: colors.primary,
           agendaDayTextColor: colors.text,
           agendaKnobColor: colors.primary,
-          backgroundColor: colors.background,
           calendarBackground: colors.background,
+          backgroundColor: colors.background,
           textSectionTitleColor: colors.text,
           dayTextColor: colors.text,
-          textDisabledColor: '#d9e1e8',
+          textDisabledColor: colors.disabled || '#d9e1e8',
           selectedDayTextColor: colors.background,
           monthTextColor: colors.text,
+          arrowColor: colors.primary,
+          indicatorColor: colors.primary,
+          textDayFontFamily: 'Roboto',
+          textMonthFontFamily: 'Roboto',
+          textDayHeaderFontFamily: 'Roboto',
+          textDayFontWeight: '400',
+          textMonthFontWeight: 'bold',
+          textDayHeaderFontWeight: '400',
         }}
         style={styles.calendar}
       />
@@ -246,7 +246,13 @@ export default function HeatmapCalendarScreen() {
               data={tasksForSelectedDate}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
-                <View style={[styles.taskCard, { borderLeftColor: item.color }]}>
+                <View style={[
+                  styles.taskCard, 
+                  { 
+                    borderLeftColor: item.color, 
+                    backgroundColor: colors.surface 
+                  }
+                ]}>
                   <View style={styles.taskHeader}>
                     <Text style={[styles.taskName, { color: colors.text }]}>{item.name}</Text>
                     <TouchableOpacity onPress={() => openMoveModal(item.id)}>
@@ -267,27 +273,27 @@ export default function HeatmapCalendarScreen() {
       )}
 
       <FAB
-        style={styles.fab}
+        style={[styles.fab, { backgroundColor: colors.primary }]}
         small
         icon="plus"
         onPress={() => navigation.navigate('AddTaskScreen', { boardId: null })}
         label="Dodaj zadanie"
       />
 
-      {/* Modal for moving task */}
       <Portal>
         <Modal 
           visible={moveModalVisible} 
           onDismiss={() => setMoveModalVisible(false)} 
-          contentContainerStyle={styles.modalContainer}
+          contentContainerStyle={[styles.modalContainer, { backgroundColor: colors.surface }]}
         >
-          <Text style={styles.modalTitle}>Przenieś Zadanie</Text>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>Przenieś Zadanie</Text>
           <FlatList
             data={availableBoards}
             renderItem={({ item }) => (
               <List.Item
                 key={item.id}
                 title={item.name}
+                titleStyle={{ color: colors.text }}
                 left={() => <List.Icon icon="folder" color={item.color || colors.primary} />}
                 onPress={() => moveTaskHandler(item.id)}
               />
@@ -295,7 +301,11 @@ export default function HeatmapCalendarScreen() {
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ maxHeight: '70%' }}
           />
-          <Button onPress={() => setMoveModalVisible(false)} style={styles.modalButton}>
+          <Button 
+            onPress={() => setMoveModalVisible(false)} 
+            style={styles.modalButton}
+            color={colors.primary}
+          >
             Anuluj
           </Button>
         </Modal>
@@ -326,11 +336,11 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   taskCard: {
-    backgroundColor: '#f9f9f9',
     borderLeftWidth: 5,
     padding: 10,
     marginBottom: 10,
     borderRadius: 5,
+    // backgroundColor oraz borderLeftColor ustalane dynamicznie z motywu i item.color
   },
   taskHeader: {
     flexDirection: 'row',
@@ -343,7 +353,7 @@ const styles = StyleSheet.create({
   },
   moveText: {
     fontSize: 14,
-    color: '#0366d6',
+    // Kolor ustawiany dynamicznie w kodzie
   },
   taskDescription: {
     fontSize: 14,
@@ -359,13 +369,14 @@ const styles = StyleSheet.create({
     margin: 16,
     right: 0,
     bottom: 0,
+    // Tło fab ustawione dynamicznie
   },
   modalContainer: {
-    backgroundColor: '#fff',
     padding: 20,
     margin: 20,
     borderRadius: 8,
     maxHeight: '80%',
+    // backgroundColor ustawione dynamicznie
   },
   modalTitle: {
     fontSize: 18,

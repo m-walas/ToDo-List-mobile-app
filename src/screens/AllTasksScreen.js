@@ -42,63 +42,67 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const TaskItem = memo(({ item, toggleCompletion, navigateToTask, openMenu, openMoveModal, prioritize }) => (
-  <View style={styles.taskItem}>
-    <TouchableOpacity onPress={() => toggleCompletion(item.id, item.isCompleted)}>
-      <IconButton
-        icon={item.isCompleted ? 'check-circle' : 'checkbox-blank-circle-outline'}
-        size={24}
-        color="#6200ee"
-      />
-    </TouchableOpacity>
-    <TouchableOpacity onPress={() => navigateToTask(item.id)} style={{ flex: 1 }}>
-      <Text style={item.isCompleted ? styles.completedTask : styles.incompleteTask}>
-        {item.text}
-      </Text>
-    </TouchableOpacity>
-    <Menu
-      visible={item.menuVisible}
-      onDismiss={() => openMenu(item.id, false)}
-      anchor={
+const TaskItem = memo(({ item, toggleCompletion, navigateToTask, openMenu, openMoveModal, prioritize }) => {
+  const { colors } = useTheme();
+  
+  return (
+    <View style={styles.taskItem}>
+      <TouchableOpacity onPress={() => toggleCompletion(item.id, item.isCompleted)}>
         <IconButton
-          icon="dots-vertical"
+          icon={item.isCompleted ? 'check-circle' : 'checkbox-blank-circle-outline'}
           size={24}
-          color="#6200ee"
-          onPress={() => openMenu(item.id, true)}
+          color={colors.primary}
         />
-      }
-    >
-      <Menu.Item
-        onPress={() => {
-          openMenu(item.id, false);
-          openMoveModal(item.id); // Otwórz modal
-        }}
-        title="Przenieś do innej tablicy"
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => navigateToTask(item.id)} style={{ flex: 1 }}>
+        <Text style={item.isCompleted ? [styles.completedTask, { color: colors.text }] : [styles.incompleteTask, { color: colors.text }]}>
+          {item.text}
+        </Text>
+      </TouchableOpacity>
+      <Menu
+        visible={item.menuVisible}
+        onDismiss={() => openMenu(item.id, false)}
+        anchor={
+          <IconButton
+            icon="dots-vertical"
+            size={24}
+            color={colors.primary}
+            onPress={() => openMenu(item.id, true)}
+          />
+        }
+      >
+        <Menu.Item
+          onPress={() => {
+            openMenu(item.id, false);
+            openMoveModal(item.id); // Otwórz modal
+          }}
+          title="Przenieś do innej tablicy"
+        />
+        <Menu.Item
+          onPress={() => {
+            openMenu(item.id, false);
+            Alert.alert(
+              'Usuń Zadanie',
+              'Czy na pewno chcesz usunąć to zadanie?',
+              [
+                { text: 'Anuluj', style: 'cancel' },
+                { text: 'Usuń', style: 'destructive', onPress: () => deleteTask(item.id) },
+              ],
+              { cancelable: true }
+            );
+          }}
+          title="Usuń zadanie"
+        />
+      </Menu>
+      <IconButton
+        icon={item.isPrioritized ? 'star' : 'star-outline'}
+        size={24}
+        color={item.isPrioritized ? '#ffd700' : colors.text}
+        onPress={() => prioritize(item.id, item.isPrioritized)}
       />
-      <Menu.Item
-        onPress={() => {
-          openMenu(item.id, false);
-          Alert.alert(
-            'Usuń Zadanie',
-            'Czy na pewno chcesz usunąć to zadanie?',
-            [
-              { text: 'Anuluj', style: 'cancel' },
-              { text: 'Usuń', style: 'destructive', onPress: () => deleteTask(item.id) },
-            ],
-            { cancelable: true }
-          );
-        }}
-        title="Usuń zadanie"
-      />
-    </Menu>
-    <IconButton
-      icon={item.isPrioritized ? 'star' : 'star-outline'}
-      size={24}
-      color={item.isPrioritized ? '#ffd700' : '#555'}
-      onPress={() => prioritize(item.id, item.isPrioritized)}
-    />
-  </View>
-));
+    </View>
+  );
+});
 
 export default function AllTasksScreen() {
   const { colors } = useTheme();
