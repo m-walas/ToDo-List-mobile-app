@@ -1,91 +1,94 @@
-// src/screens/GitHubTasksScreen.js
-
 import React, { useState } from 'react';
-import { View, StyleSheet, FlatList } from 'react-native';
-import { Button, Text, useTheme, ActivityIndicator, Snackbar } from 'react-native-paper';
-import { fetchGitHubIssues, mapIssuesToTasks } from '../services/github';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { GITHUB_REPO_OWNER, GITHUB_REPO_NAME } from '@env';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, Button, StyleSheet, Alert } from 'react-native';
+import * as AuthSession from 'expo-auth-session';
+import { auth } from '../firebase';
+import { GithubAuthProvider, signInWithCredential } from 'firebase/auth';
+import { GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET } from '@env';
+import * as WebBrowser from 'expo-web-browser';
 
-export default function GitHubTasksScreen() {
-  const { colors } = useTheme();
-  const [githubTasks, setGithubTasks] = useState([]);
-  const [gitHubAccessToken, setGitHubAccessToken] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [snackbarVisible, setSnackbarVisible] = useState(false);
+const REDIRECT_URI = 'https://todo-list-app-a9318.firebaseapp.com/__/auth/handler';
 
-  const loadGitHubIssues = async () => {
-    setLoading(true);
-    if (!gitHubAccessToken) {
-      const token = await AsyncStorage.getItem('githubAccessToken');
-      setGitHubAccessToken(token);
-      if (!token) {
-        setLoading(false);
-        Alert.alert('Błąd', 'Brak tokenu dostępu GitHub. Zaloguj się ponownie.');
-        return;
+const GitHubTasksScreen = () => {
+  const [githubToken, setGithubToken] = useState(null);
+
+  const handleGitHubLogin = async () => {
+    const authUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(
+      REDIRECT_URI
+    )}&scope=repo`;
+  
+    const result = await WebBrowser.openAuthSessionAsync(authUrl, REDIRECT_URI);
+    console.log('WebBrowser result:', result);
+  
+    if (result.type === 'success' && result.url) {
+      const params = new URLSearchParams(result.url.split('?')[1]);
+      const code = params.get('code');
+  
+      if (code) {
+        // Wymień kod na token
+        const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            client_id: GITHUB_CLIENT_ID,
+            client_secret: GITHUB_CLIENT_SECRET,
+            code,
+            redirect_uri: REDIRECT_URI,
+          }),
+        });
+  
+        const data = await tokenResponse.json();
+  
+        if (data.access_token) {
+          // Ustaw token GitHub i zaloguj do Firebase
+          setGithubToken(data.access_token);
+          const credential = GithubAuthProvider.credential(data.access_token);
+          await signInWithCredential(auth, credential);
+          Alert.alert('Success', 'You are now logged in with GitHub!');
+        } else {
+          Alert.alert('Error', 'Failed to retrieve access token');
+        }
       }
-    }
-
-    try {
-      const issues = await fetchGitHubIssues(gitHubAccessToken, GITHUB_REPO_OWNER, GITHUB_REPO_NAME);
-      const tasksFromGitHub = mapIssuesToTasks(issues);
-      setGithubTasks(tasksFromGitHub);
-      setLoading(false);
-      setSnackbarVisible(true);
-    } catch (error) {
-      setLoading(false);
-      console.error('Error fetching GitHub issues:', error);
-      Alert.alert('Błąd', 'Nie udało się pobrać zadań z GitHub.');
     }
   };
 
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <Button mode="contained" onPress={loadGitHubIssues} style={styles.button}>
-        Pobierz zadania z GitHub
-      </Button>
-      {loading && <ActivityIndicator animating={true} color={colors.primary} />}
-      <FlatList
-        data={githubTasks}
-        renderItem={({ item }) => (
-          <View style={styles.taskItem}>
-            <Text style={item.isCompleted ? styles.completedTask : styles.incompleteTask}>
-              {item.title}
-            </Text>
-          </View>
-        )}
-        keyExtractor={(item) => item.id}
+    <View style={styles.container}>
+      <Text style={styles.title}>GitHub Tasks</Text>
+      <Button
+        title="Login with GitHub"
+        onPress={handleGitHubLogin}
+        color="#0366d6"
       />
-      <Snackbar
-        visible={snackbarVisible}
-        onDismiss={() => setSnackbarVisible(false)}
-        duration={3000}
-      >
-        Zadania zostały pobrane z GitHub!
-      </Snackbar>
-    </SafeAreaView>
+      {githubToken && (
+        <Text style={styles.token}>Logged in! Token: {githubToken}</Text>
+      )}
+    </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#fff',
   },
-  button: {
-    marginBottom: 10,
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
   },
-  taskItem: {
-    padding: 10,
-    borderBottomColor: '#ccc',
-    borderBottomWidth: 1,
-  },
-  completedTask: {
-    textDecorationLine: 'line-through',
-    color: 'gray',
-  },
-  incompleteTask: {
-    color: 'black',
+  token: {
+    marginTop: 20,
+    fontSize: 14,
+    color: '#586069',
+    textAlign: 'center',
   },
 });
+
+export default GitHubTasksScreen;

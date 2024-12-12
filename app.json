@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "ToDoListApp",
-    "slug": "ToDoListApp",
+    "name": "todolistapp",
+    "slug": "todolistapp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -30,6 +30,12 @@
     "scheme": "todolistmobileapp",
     "plugins": [
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "0a023097-b78a-4ca8-9435-5105b107fac4"
+      }
+    },
+    "owner": "jgodula"
   }
 }
