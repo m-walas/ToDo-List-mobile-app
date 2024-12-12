@@ -33,6 +33,7 @@ import {
 import { auth, db } from '../firebase';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Picker } from '@react-native-picker/picker';
 
 if (
   Platform.OS === 'android' &&
@@ -41,7 +42,7 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const TaskItem = memo(({ item, toggleCompletion, navigateToTask, openMenu, prioritize }) => (
+const TaskItem = memo(({ item, toggleCompletion, navigateToTask, openMenu, openMoveModal, prioritize }) => (
   <View style={styles.taskItem}>
     <TouchableOpacity onPress={() => toggleCompletion(item.id, item.isCompleted)}>
       <IconButton
@@ -70,9 +71,9 @@ const TaskItem = memo(({ item, toggleCompletion, navigateToTask, openMenu, prior
       <Menu.Item
         onPress={() => {
           openMenu(item.id, false);
-          openMoveModal(item.id);
+          openMoveModal(item.id); // Otwórz modal
         }}
-        title="Przenieś do Innej Tablicy"
+        title="Przenieś do innej tablicy"
       />
       <Menu.Item
         onPress={() => {
@@ -87,7 +88,7 @@ const TaskItem = memo(({ item, toggleCompletion, navigateToTask, openMenu, prior
             { cancelable: true }
           );
         }}
-        title="Usuń Zadanie"
+        title="Usuń zadanie"
       />
     </Menu>
     <IconButton
@@ -108,6 +109,8 @@ export default function AllTasksScreen() {
   const [moveModalVisible, setMoveModalVisible] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [selectedBoard, setSelectedBoard] = useState('');
+
 
   useEffect(() => {
     const tasksRef = collection(db, 'tasks');
@@ -194,8 +197,8 @@ export default function AllTasksScreen() {
   };
 
   const openMoveModal = (taskId) => {
-    setSelectedTaskId(taskId);
-    setMoveModalVisible(true);
+    setSelectedTaskId(taskId); // Ustaw ID zadania do przeniesienia
+    setMoveModalVisible(true); // Pokaż modal
   };
 
   const openMenu = (taskId, visible) => {
@@ -219,6 +222,7 @@ export default function AllTasksScreen() {
             toggleCompletion={toggleTaskCompletion} 
             navigateToTask={(id) => navigation.navigate('TaskModal', { taskId: id })}
             openMenu={openMenu}
+            openMoveModal={openMoveModal} // Dodano funkcję
             prioritize={prioritizeTask}
           />
         )}
@@ -226,10 +230,15 @@ export default function AllTasksScreen() {
         contentContainerStyle={styles.list}
         ListHeaderComponent={
           <View style={styles.header}>
-            <Text style={[styles.headerText, { color: colors.text }]}>Wszystkie Zadania</Text>
+            <Text style={[styles.headerText, { color: colors.text }]}>Wszystkie zadania</Text>
             <Button onPress={() => setShowCompleted(!showCompleted)} mode="text" color={colors.primary}>
-              {showCompleted ? 'Ukryj Ukończone' : 'Pokaż Ukończone'}
+              {showCompleted ? 'Ukryj ukończone' : 'Pokaż ukończone'}
             </Button>
+          </View>
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: colors.text }]}>Brak aktywnych zadań</Text>
           </View>
         }
         ListFooterComponent={
@@ -258,7 +267,7 @@ export default function AllTasksScreen() {
         small
         icon="plus"
         onPress={() => navigation.navigate('AddTaskScreen', { boardId: null })}
-        label="Dodaj Zadanie"
+        label="Dodaj zadanie"
       />
 
       <Portal>
@@ -267,23 +276,39 @@ export default function AllTasksScreen() {
           onDismiss={() => setMoveModalVisible(false)} 
           contentContainerStyle={styles.modalContainer}
         >
-          <Text style={styles.modalTitle}>Przenieś Zadanie</Text>
-          <FlatList
-            data={boards}
-            renderItem={({ item }) => (
-              <List.Item
-                key={item.id}
-                title={item.name}
-                left={() => <List.Icon icon="folder" color={item.color || colors.primary} />}
-                onPress={() => moveTask(selectedTaskId, item.id)}
-              />
-            )}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ maxHeight: '70%' }}
-          />
-          <Button onPress={() => setMoveModalVisible(false)} style={styles.modalButton}>
-            Anuluj
-          </Button>
+          <Dialog.Title>Przenieś do innej tablicy</Dialog.Title>
+          <Dialog.Content>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={selectedBoard}
+                onValueChange={(itemValue) => setSelectedBoard(itemValue)}
+                style={[styles.picker, { color: colors.text }]}
+                dropdownIconColor={colors.text}
+              >
+                <Picker.Item label="Wybierz Tablicę" value="" />
+                {boards.map((board) => (
+                  <Picker.Item label={board.name} value={board.id} key={board.id} />
+                ))}
+              </Picker>
+            </View>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button
+              onPress={() => {
+                if (selectedBoard) {
+                  moveTask(selectedTaskId, selectedBoard); // Przenieś zadanie
+                } else {
+                  Alert.alert('Błąd', 'Proszę wybrać tablicę.');
+                }
+              }}
+              color={colors.primary}
+            >
+              Przenieś
+            </Button>
+            <Button onPress={() => setMoveModalVisible(false)} color={colors.primary}>
+              Anuluj
+            </Button>
+          </Dialog.Actions>
         </Dialog>
       </Portal>
     </SafeAreaView>
@@ -346,4 +371,26 @@ const styles = StyleSheet.create({
   completedContainer: {
     marginTop: 20,
   },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: 'gray',
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+  picker: {
+    width: '100%',
+  },
+  
 });

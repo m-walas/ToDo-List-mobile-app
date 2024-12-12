@@ -17,45 +17,69 @@ export default function CreateBoardScreen({ navigation }) {
   const [dialogVisible, setDialogVisible] = useState(false);
 
   const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
-
-    if (!result.cancelled) {
-      setCoverImage(result.uri);
+    try {
+      console.log('Requesting permissions...');
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      console.log('Permission result:', permissionResult);
+  
+      if (permissionResult.status !== 'granted') {
+        Alert.alert('Błąd', 'Aplikacja nie ma uprawnień do galerii.');
+        return;
+      }
+  
+      console.log('Launching image picker...');
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Poprawka tutaj
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+      });
+  
+      console.log('Image picker result:', result);
+  
+      if (!result.canceled) {
+        setCoverImage(result.assets[0].uri);
+        console.log('Selected image URI:', result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error in pickImage:', error);
+      Alert.alert('Błąd', 'Wystąpił problem podczas wybierania obrazu.');
     }
   };
+  
+  
 
   const createBoard = async () => {
     if (name.trim() === '') {
       Alert.alert('Błąd', 'Proszę podać nazwę tablicy.');
       return;
     }
-
+  
     if (!auth.currentUser) {
       Alert.alert('Błąd', 'Użytkownik nie jest zalogowany.');
       return;
     }
-
+  
     let coverImageURL = null;
     if (coverImage) {
       try {
-        const response = await fetch(coverImage);
-        const blob = await response.blob();
+        console.log('Fetching image...');
+        const response = await fetch(coverImage); // Pobierz obraz z lokalnego URI
+        const blob = await response.blob(); // Konwertuj obraz na `blob`
+        console.log('Uploading image to Firebase Storage...');
         const storageRef = ref(storage, `boardCovers/${auth.currentUser.uid}/${Date.now()}`);
-        await uploadBytes(storageRef, blob);
-        coverImageURL = await getDownloadURL(storageRef);
+        await uploadBytes(storageRef, blob); // Prześlij obraz
+        coverImageURL = await getDownloadURL(storageRef); // Pobierz URL obrazu
+        console.log('Image uploaded successfully:', coverImageURL);
       } catch (error) {
         console.error('Error uploading cover image:', error);
         Alert.alert('Błąd', 'Nie udało się załadować obrazu.');
         return;
       }
     }
-
+  
     try {
+      console.log('Creating board in Firestore...');
       await addDoc(collection(db, 'boards'), {
         name,
         color,
@@ -69,6 +93,7 @@ export default function CreateBoardScreen({ navigation }) {
       Alert.alert('Błąd', 'Nie udało się stworzyć tablicy.');
     }
   };
+  
 
   const renderColorOption = ({ item }) => (
     <TouchableOpacity
@@ -84,7 +109,7 @@ export default function CreateBoardScreen({ navigation }) {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.label, { color: colors.text }]}>Nazwa Tablicy</Text>
+      <Text style={[styles.label, { color: colors.text }]}>Nazwa tablicy</Text>
       <TextInput
         style={[styles.input, { color: colors.text, borderColor: colors.primary }]}
         placeholder="Wpisz nazwę tablicy"
@@ -93,12 +118,12 @@ export default function CreateBoardScreen({ navigation }) {
         onChangeText={setName}
       />
 
-      <Text style={[styles.label, { color: colors.text }]}>Kolor Tablicy</Text>
+      <Text style={[styles.label, { color: colors.text }]}>Kolor tablicy</Text>
       <TouchableOpacity onPress={() => setDialogVisible(true)} style={[styles.colorPreview, { backgroundColor: color }]} />
 
       <Portal>
         <Dialog visible={dialogVisible} onDismiss={() => setDialogVisible(false)}>
-          <Dialog.Title style={{ color: colors.text }}>Wybierz Kolor</Dialog.Title>
+          <Dialog.Title style={{ color: colors.text }}>Wybierz kolor</Dialog.Title>
           <Dialog.Content style={{ backgroundColor: colors.surface }}>
             <FlatList
               data={COLORS}
@@ -114,17 +139,20 @@ export default function CreateBoardScreen({ navigation }) {
         </Dialog>
       </Portal>
 
-      <Text style={[styles.label, { color: colors.text }]}>Okładka Tablicy</Text>
+      <Text style={[styles.label, { color: colors.text }]}>Okładka tablicy</Text>
       <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
         {coverImage ? (
           <Image source={{ uri: coverImage }} style={styles.coverImage} />
         ) : (
-          <Text style={{ color: colors.placeholder || '#888' }}>Wybierz Obraz</Text>
+          <Text style={{ color: colors.placeholder || '#888' }}>Wybierz obraz</Text>
         )}
       </TouchableOpacity>
 
+
+
+
       <Button mode="contained" onPress={createBoard} style={styles.button} color={colors.primary}>
-        Stwórz Tablicę
+        Stwórz tablicę
       </Button>
     </SafeAreaView>
   );

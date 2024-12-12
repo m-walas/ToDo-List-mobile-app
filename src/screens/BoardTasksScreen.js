@@ -411,6 +411,11 @@ export default function BoardTasksScreen() {
             </Button>
           </View>
         }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: colors.text }]}>Brak aktywnych zadań</Text>
+          </View>
+        }
         ListFooterComponent={
           showCompleted && completedTasks.length > 0 ? (
             <View style={styles.completedContainer}>
@@ -618,5 +623,16 @@ const styles = StyleSheet.create({
   },
   colorsContainer: {
     justifyContent: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: 'gray',
   },
 });

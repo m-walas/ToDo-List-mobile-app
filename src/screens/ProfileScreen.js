@@ -38,35 +38,47 @@ export default function ProfileScreen() {
   }, []);
 
   const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.5,
-    });
-
-    if (!result.cancelled) {
-      setAvatar(result.uri);
-      uploadAvatar(result.uri);
+    try {
+      console.log('pickImage function called'); // Log wywołania
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Użyj MediaTypeOptions, jeśli inne opcje nie działają
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+      });
+  
+      console.log('Image picker result:', result); // Log wyniku
+  
+      if (!result.canceled) {
+        const selectedImageUri = result.assets[0].uri; // Pobierz URI obrazu
+        console.log('Selected image URI:', selectedImageUri);
+        setAvatar(selectedImageUri);
+        await uploadAvatar(selectedImageUri);
+      }
+    } catch (error) {
+      console.error('Error in pickImage:', error); // Log błędu
+      Alert.alert('Błąd', 'Nie udało się otworzyć galerii.');
     }
   };
+  
 
   const uploadAvatar = async (uri) => {
     try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
+      console.log('Uploading avatar:', uri);
+      const response = await fetch(uri); // Pobierz obraz z URI
+      const blob = await response.blob(); // Konwertuj obraz na blob
       const storageRef = ref(storage, `avatars/${auth.currentUser.uid}`);
       await uploadBytes(storageRef, blob);
       const downloadURL = await getDownloadURL(storageRef);
-      await updateDoc(doc(db, 'users', auth.currentUser.uid), {
-        avatar: downloadURL,
-      });
+      console.log('Download URL:', downloadURL);
+      await updateDoc(doc(db, 'users', auth.currentUser.uid), { avatar: downloadURL });
       Alert.alert('Sukces', 'Awatar został zaktualizowany.');
     } catch (error) {
       console.error('Error uploading avatar:', error);
       Alert.alert('Błąd', 'Nie udało się załadować awatara.');
     }
   };
+  
 
   const saveProfile = async () => {
     try {
@@ -112,7 +124,7 @@ export default function ProfileScreen() {
           <Avatar.Icon size={100} icon="account" />
         )}
         <Button onPress={pickImage} style={styles.avatarButton} mode="outlined" color={colors.primary}>
-          Zmień Awatar
+          Zmień awatar
         </Button>
       </View>
 
@@ -134,7 +146,7 @@ export default function ProfileScreen() {
           theme={{ colors: { primary: colors.primary } }}
         />
         <Button mode="contained" onPress={saveProfile} style={styles.saveButton} color={colors.primary}>
-          Zapisz Profil
+          Zapisz profil
         </Button>
       </View>
 

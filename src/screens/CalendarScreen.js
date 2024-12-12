@@ -271,7 +271,7 @@ export default function HeatmapCalendarScreen() {
         small
         icon="plus"
         onPress={() => navigation.navigate('AddTaskScreen', { boardId: null })}
-        label="Dodaj Zadanie"
+        label="Dodaj zadanie"
       />
 
       {/* Modal for moving task */}

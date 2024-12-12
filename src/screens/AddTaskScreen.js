@@ -1,19 +1,42 @@
 // src/screens/AddTaskScreen.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Alert, Platform } from 'react-native';
 import { Text, TextInput, Button, useTheme } from 'react-native-paper';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Picker } from '@react-native-picker/picker';
 
 export default function AddTaskScreen({ route, navigation }) {
   const { colors } = useTheme();
-  const { boardId } = route.params;
+  const { boardId: initialBoardId } = route.params || {};
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [deadline, setDeadline] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [boards, setBoards] = useState([]);
+  const [selectedBoard, setSelectedBoard] = useState(initialBoardId || '');
+
+  useEffect(() => {
+    if (!auth.currentUser) return;
+
+    const boardsRef = collection(db, 'boards');
+    const q = query(boardsRef, where('userId', '==', auth.currentUser.uid));
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const fetchedBoards = [];
+      querySnapshot.forEach((doc) => {
+        fetchedBoards.push({ id: doc.id, ...doc.data() });
+      });
+      setBoards(fetchedBoards);
+      if (!initialBoardId && fetchedBoards.length > 0) {
+        setSelectedBoard(fetchedBoards[0].id); // Automatyczny wybór pierwszej tablicy
+      }
+    });
+
+    return () => unsubscribe();
+  }, [initialBoardId]);
 
   const createTask = async () => {
     if (title.trim() === '') {
@@ -21,13 +44,8 @@ export default function AddTaskScreen({ route, navigation }) {
       return;
     }
 
-    if (!boardId) {
-      Alert.alert('Błąd', 'Brak wybranej tablicy. Przejdź z ekranu tablicy, aby wybrać tablicę.');
-      return;
-    }
-
-    if (!auth.currentUser) {
-      Alert.alert('Błąd', 'Użytkownik nie jest zalogowany.');
+    if (!selectedBoard) {
+      Alert.alert('Błąd', 'Proszę wybrać tablicę.');
       return;
     }
 
@@ -36,7 +54,7 @@ export default function AddTaskScreen({ route, navigation }) {
         text: title,
         description,
         deadline: deadline || null,
-        boardId,
+        boardId: selectedBoard,
         userId: auth.currentUser.uid,
         isCompleted: false,
         isPrioritized: false,
@@ -47,15 +65,6 @@ export default function AddTaskScreen({ route, navigation }) {
     } catch (error) {
       console.error('Error adding task:', error);
       Alert.alert('Błąd', 'Nie udało się dodać zadania.');
-    }
-  };
-
-  const onChangeDate = (event, selectedDate) => {
-    if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-    }
-    if (selectedDate) {
-      setDeadline(selectedDate);
     }
   };
 
@@ -80,22 +89,36 @@ export default function AddTaskScreen({ route, navigation }) {
         multiline
       />
 
-      <Button
-        mode="outlined"
-        onPress={() => setShowDatePicker(true)}
-        style={styles.button}
-      >
-        {deadline ? `Deadline: ${deadline.toLocaleDateString()}` : 'Wybierz deadline'}
-      </Button>
-
-      {showDatePicker && (
+      <View style={styles.deadlineContainer}>
+        <Text style={[styles.label, { color: colors.text }]}>Deadline</Text>
         <DateTimePicker
           value={deadline || new Date()}
           mode="date"
           display="default"
-          onChange={onChangeDate}
+          onChange={(event, selectedDate) => {
+            if (selectedDate) {
+              setDeadline(selectedDate); // Ustaw wybraną datę jako deadline
+            }
+          }}
+          style={styles.datePicker} // Stylizacja dla estetycznego dopasowania
         />
-      )}
+      </View>
+
+      <Text style={[styles.label, { color: colors.text }]}>Wybierz Tablicę</Text>
+      <View style={styles.pickerContainer}>
+        <Picker
+          selectedValue={selectedBoard}
+          onValueChange={(itemValue) => setSelectedBoard(itemValue)}
+          style={[styles.picker, { color: colors.text }]}
+          dropdownIconColor={colors.text}
+          mode="dropdown"
+        >
+          <Picker.Item label="Wybierz Tablicę" value="" />
+          {boards.map((board) => (
+            <Picker.Item label={board.name} value={board.id} key={board.id} />
+          ))}
+        </Picker>
+      </View>
 
       <Button
         mode="contained"
@@ -127,5 +150,24 @@ const styles = StyleSheet.create({
   },
   button: {
     marginTop: 20,
+  },
+  deadlineContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 15,
+  },
+  datePicker: {
+    marginLeft: 10,
+    flex: 1,
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  picker: {
+    width: '100%',
   },
 });

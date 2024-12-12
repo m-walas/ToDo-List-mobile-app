@@ -1,8 +1,7 @@
 // src/components/TaskModal.js
-
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Alert, Platform } from 'react-native';
-import { Button, useTheme, Modal, Portal, TextInput } from 'react-native-paper';
+import { StyleSheet, Alert, Platform, View } from 'react-native';
+import { Button, useTheme, Modal, Portal, TextInput, Text } from 'react-native-paper'; // Dodano Text
 import { doc, updateDoc, deleteDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -15,7 +14,6 @@ export default function TaskModal({ route, navigation }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [deadline, setDeadline] = useState(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedBoard, setSelectedBoard] = useState('');
   const [boards, setBoards] = useState([]);
 
@@ -107,48 +105,51 @@ export default function TaskModal({ route, navigation }) {
     );
   };
 
-  const onChangeDate = (event, selectedDate) => {
-    if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-    }
-    if (selectedDate) {
-      setDeadline(selectedDate);
-    }
-  };
-
   return (
     <Portal>
       <Modal visible={true} onDismiss={() => navigation.goBack()} contentContainerStyle={[styles.container, { backgroundColor: colors.surface }]}>
-        <TextInput
-          style={[styles.input, { color: colors.text, borderColor: colors.primary }]}
-          placeholder="Tytuł zadania"
-          placeholderTextColor={colors.placeholder || '#888'}
-          value={title}
-          onChangeText={setTitle}
-        />
-        <TextInput
-          style={[styles.input, { color: colors.text, borderColor: colors.primary }]}
-          placeholder="Opis"
-          placeholderTextColor={colors.placeholder || '#888'}
-          value={description}
-          onChangeText={setDescription}
-          multiline
-        />
-        <Button
-          mode="outlined"
-          onPress={() => setShowDatePicker(true)}
-          style={styles.button}
-        >
-          {deadline ? `Deadline: ${deadline.toLocaleDateString()}` : 'Wybierz deadline'}
-        </Button>
-        {showDatePicker && (
+        
+        {/* Tytuł */}
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, { color: colors.text }]}>Tytuł</Text>
+          <TextInput
+            style={[styles.input, { color: colors.text, borderColor: colors.primary }]}
+            placeholder="Wpisz tytuł zadania"
+            placeholderTextColor={colors.placeholder || '#888'}
+            value={title}
+            onChangeText={setTitle}
+          />
+        </View>
+
+        {/* Opis */}
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, { color: colors.text }]}>Opis</Text>
+          <TextInput
+            style={[styles.input, { color: colors.text, borderColor: colors.primary }]}
+            placeholder="Wpisz opis zadania"
+            placeholderTextColor={colors.placeholder || '#888'}
+            value={description}
+            onChangeText={setDescription}
+            multiline
+          />
+        </View>
+
+        {/* Deadline */}
+        <View style={styles.rowContainer}>
+          <Text style={[styles.label, { color: colors.text }]}>Deadline</Text>
           <DateTimePicker
             value={deadline || new Date()}
             mode="date"
             display="default"
-            onChange={onChangeDate}
+            onChange={(event, selectedDate) => {
+              if (selectedDate) {
+                setDeadline(selectedDate); // Ustaw wybraną datę
+              }
+            }}
+            style={styles.datePicker}
           />
-        )}
+        </View>
+        {/* Tablica */}
         {boards.length > 0 && (
           <Picker
             selectedValue={selectedBoard}
@@ -161,6 +162,8 @@ export default function TaskModal({ route, navigation }) {
             ))}
           </Picker>
         )}
+
+        {/* Przyciski */}
         <Button
           mode="contained"
           onPress={saveChanges}
@@ -195,12 +198,32 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 8,
   },
+  inputContainer: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 16,
+    marginBottom: 5,
+  },
   input: {
     borderBottomWidth: 1,
-    marginBottom: 15,
     paddingHorizontal: 5,
+    borderColor: '#ccc',
+  },
+  datePicker: {
+    marginTop: 5,
   },
   button: {
     marginTop: 10,
+  },
+  rowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  datePicker: {
+    flex: 1,
+    alignSelf: 'flex-end',
   },
 });
