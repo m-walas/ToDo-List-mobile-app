@@ -18,7 +18,7 @@ export default function LoginScreen({ navigation }) {
     {
       clientId: GITHUB_CLIENT_ID,
       scopes: ['read:user', 'user:email', 'repo'],
-      redirectUri: GITHUB_REDIRECT_URI,
+      redirectUri: AuthSession.makeRedirectUri({ scheme: 'todolistmobileapp' }),
       usePKCE: true,
     },
     {
@@ -44,7 +44,7 @@ export default function LoginScreen({ navigation }) {
         client_id: clientId,
         code,
         code_verifier: codeVerifier,
-        redirect_uri: GITHUB_REDIRECT_URI,
+        redirectUri: AuthSession.makeRedirectUri({ scheme: 'todolistmobileapp' }),
       };
 
       const formBody = Object.keys(params)

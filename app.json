@@ -22,7 +22,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.mwalas.todolistapp"
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
@@ -33,9 +34,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "0a023097-b78a-4ca8-9435-5105b107fac4"
+        "projectId": "00f8afa0-5e78-40e2-87b4-0104544fedd9"
       }
     },
-    "owner": "jgodula"
+    "owner": "mwalas"
   }
 }

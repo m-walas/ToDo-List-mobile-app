@@ -6,7 +6,7 @@ import { GithubAuthProvider, signInWithCredential } from 'firebase/auth';
 import { GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET } from '@env';
 import * as WebBrowser from 'expo-web-browser';
 
-const REDIRECT_URI = 'https://todo-list-app-a9318.firebaseapp.com/__/auth/handler';
+const REDIRECT_URI = AuthSession.makeRedirectUri({ scheme: 'todolistmobileapp' });
 
 const GitHubTasksScreen = () => {
   const [githubToken, setGithubToken] = useState(null);
