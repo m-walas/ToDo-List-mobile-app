@@ -36,6 +36,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LocaleConfig } from 'react-native-calendars';
 import { useColorScheme } from 'react-native';
 import * as CalendarExpo from 'expo-calendar';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
 
 LocaleConfig.locales['pl'] = {
   monthNames: [
@@ -130,7 +132,9 @@ export default function CalendarScreen() {
             color: board.color || colors.primary,
             description: task.description || '',
             boardName: board.name || 'Brak nazwy tablicy',
-            deadline: date
+            deadline: date,
+            deadlineDate: new Date(task.deadline),
+            notificationId: task.notificationId || null, // Dodane pole
           });
         }
       });
@@ -184,10 +188,15 @@ export default function CalendarScreen() {
 
   const moveTaskHandler = async (newBoardId) => {
     try {
+      // Anuluj istniejące powiadomienie
+      await cancelScheduledNotifications(selectedTaskId);
+
+      // Aktualizuj boardId
       const taskRef = doc(db, 'tasks', selectedTaskId);
       await updateDoc(taskRef, {
         boardId: newBoardId,
       });
+
       setMoveModalVisible(false);
       setSelectedTaskId(null);
       Alert.alert('Sukces', 'Zadanie zostało przeniesione.');
@@ -200,59 +209,6 @@ export default function CalendarScreen() {
   const openMoveModal = (taskId) => {
     setSelectedTaskId(taskId);
     setMoveModalVisible(true);
-  };
-
-  // // Funkcja do eksportowania pojedynczego zadania do kalendarza systemowego
-  // const exportTaskToCalendar = async (task) => {
-  //   try {
-  //     if (!calendarId) {
-  //       Alert.alert('Błąd', 'Kalendarz nie jest dostępny.');
-  //       return;
-  //     }
-
-  //     const taskDate = new Date(task.deadline);
-  //     taskDate.setHours(9, 0, 0);
-
-  //     await CalendarExpo.createEventAsync(calendarId, {
-  //       title: task.name,
-  //       startDate: taskDate,
-  //       endDate: new Date(taskDate.getTime() + 60 * 60 * 1000),
-  //       notes: task.description,
-  //       color: task.color,
-  //     });
-
-  //     Alert.alert('Sukces', `Zadanie "${task.name}" zostało wyeksportowane do kalendarza.`);
-  //   } catch (error) {
-  //     console.error('Błąd przy eksportowaniu zadania do kalendarza:', error);
-  //     Alert.alert('Błąd', `Nie udało się wyeksportować zadania "${task.name}".`);
-  //   }
-  // };
-
-  // Funkcja do eksportowania pojedynczego zadania do Kalendarza Google
-  const exportTaskToGoogleCalendar = (task) => {
-    const startDate = new Date(task.deadline);
-    startDate.setHours(9, 0, 0); // Ustawienie godziny rozpoczęcia
-    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // 1 godzina później
-
-    const formatDate = (date) => {
-      return date.toISOString().replace(/-|:|\.\d\d\d/g,"");
-    };
-
-    const eventTitle = encodeURIComponent(task.name);
-    const eventDescription = encodeURIComponent(task.description || 'Brak opisu.');
-    const eventLocation = encodeURIComponent(task.boardName || 'Brak lokalizacji.');
-
-    const googleCalendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${eventTitle}&dates=${formatDate(startDate)}/${formatDate(endDate)}&details=${eventDescription}&location=${eventLocation}&sf=true&output=xml`;
-
-    Linking.canOpenURL(googleCalendarUrl)
-      .then((supported) => {
-        if (supported) {
-          return Linking.openURL(googleCalendarUrl);
-        } else {
-          Alert.alert('Błąd', 'Nie można otworzyć Kalendarza Google.');
-        }
-      })
-      .catch((err) => console.error('An error occurred', err));
   };
 
   // Funkcja pomocnicza do uzyskania domyślnego kalendarza lub jego utworzenia
@@ -294,6 +250,194 @@ export default function CalendarScreen() {
     }
   };
 
+  // Funkcja do uzyskiwania uprawnień do powiadomień i ustawienia konfiguracji
+  const registerForPushNotificationsAsync = async () => {
+    let token;
+
+    if (Device.isDevice) {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') {
+        Alert.alert('Brak uprawnień', 'Aplikacja nie ma dostępu do powiadomień.');
+        return;
+      }
+      token = (await Notifications.getExpoPushTokenAsync()).data;
+      console.log(token);
+    } else {
+      Alert.alert('Błąd', 'Nie można zarejestrować powiadomień na emulatorze.');
+    }
+
+    if (Platform.OS === 'android') {
+      Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      });
+    }
+
+    return token;
+  };
+
+  useEffect(() => {
+    registerForPushNotificationsAsync();
+  }, []);
+
+  // Funkcja do harmonogramowania powiadomienia 24h przed terminem zadania
+  const scheduleNotification = async (task) => {
+    try {
+      const trigger = new Date(task.deadlineDate);
+      trigger.setDate(trigger.getDate() - 1); // 24 godziny przed
+      trigger.setHours(9, 0, 0); // Możesz dostosować godzinę powiadomienia
+
+      if (trigger < new Date()) {
+        // Jeśli czas powiadomienia już minął, nie harmonogramuj
+        return;
+      }
+
+      const notificationId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `Przypomnienie: ${task.name}`,
+          body: `Masz 24 godziny na wykonanie zadania.`,
+          data: { taskId: task.id },
+        },
+        trigger,
+      });
+
+      // Zaktualizuj zadanie w Firestore z notificationId
+      const taskRef = doc(db, 'tasks', task.id);
+      await updateDoc(taskRef, {
+        notificationId: notificationId,
+      });
+
+    } catch (error) {
+      console.error('Błąd przy harmonogramowaniu powiadomienia:', error);
+    }
+  };
+
+  // Funkcja do usuwania powiadomień związanych z zadaniem
+  const cancelScheduledNotifications = async (taskId) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task && task.notificationId) {
+      await Notifications.cancelScheduledNotificationAsync(task.notificationId);
+      // Usuń notificationId z Firestore
+      const taskRef = doc(db, 'tasks', taskId);
+      await updateDoc(taskRef, {
+        notificationId: null,
+      });
+    }
+  };
+
+  // Funkcja do harmonogramowania powiadomień dla wszystkich zadań
+  const scheduleAllNotifications = async () => {
+    for (const task of tasks) {
+      await scheduleNotification(task);
+    }
+  };
+
+  // Harmonogramowanie powiadomień po załadowaniu zadań
+  useEffect(() => {
+    if (!loading) {
+      scheduleAllNotifications();
+    }
+  }, [loading, tasks]);
+
+  // Funkcja do eksportowania wszystkich zadań do kalendarza systemowego
+  const exportTasksToCalendar = async () => {
+    try {
+      // Sprawdzenie uprawnień
+      const status = await CalendarExpo.requestCalendarPermissionsAsync();
+      if (status.status !== 'granted') {
+        Alert.alert('Brak uprawnień', 'Aplikacja nie ma dostępu do kalendarza.');
+        return;
+      }
+
+      // Iteracja przez wszystkie zadania i dodawanie ich do kalendarza
+      for (const task of tasks) {
+        if (!calendarId) {
+          Alert.alert('Błąd', 'Kalendarz nie jest dostępny.');
+          return;
+        }
+
+        // Konwersja daty na Date object
+        const taskDate = new Date(task.deadline);
+        // Ustawienie czasu na początek dnia
+        taskDate.setHours(9, 0, 0); // Możesz dostosować godzinę
+
+        // Dodanie wydarzenia do kalendarza
+        await CalendarExpo.createEventAsync(calendarId, {
+          title: task.name,
+          startDate: taskDate,
+          endDate: new Date(taskDate.getTime() + 60 * 60 * 1000), // 1 godzina później
+          notes: task.description,
+          color: task.color,
+        });
+      }
+
+      Alert.alert('Sukces', 'Wszystkie zadania zostały wyeksportowane do kalendarza.');
+    } catch (error) {
+      console.error('Błąd przy eksportowaniu do kalendarza:', error);
+      Alert.alert('Błąd', 'Nie udało się wyeksportować zadań do kalendarza.');
+    }
+  };
+
+  // Opcjonalnie: Funkcja do eksportowania pojedynczego zadania do kalendarza systemowego
+  const exportTaskToCalendar = async (task) => {
+    try {
+      if (!calendarId) {
+        Alert.alert('Błąd', 'Kalendarz nie jest dostępny.');
+        return;
+      }
+
+      const taskDate = new Date(task.deadline);
+      taskDate.setHours(9, 0, 0);
+
+      await CalendarExpo.createEventAsync(calendarId, {
+        title: task.name,
+        startDate: taskDate,
+        endDate: new Date(taskDate.getTime() + 60 * 60 * 1000),
+        notes: task.description,
+        color: task.color,
+      });
+
+      Alert.alert('Sukces', `Zadanie "${task.name}" zostało wyeksportowane do kalendarza.`);
+    } catch (error) {
+      console.error('Błąd przy eksportowaniu zadania do kalendarza:', error);
+      Alert.alert('Błąd', `Nie udało się wyeksportować zadania "${task.name}".`);
+    }
+  };
+
+  // Funkcja do eksportowania pojedynczego zadania do Kalendarza Google
+  const exportTaskToGoogleCalendar = (task) => {
+    const startDate = new Date(task.deadline);
+    startDate.setHours(9, 0, 0); // Ustawienie godziny rozpoczęcia
+    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // 1 godzina później
+
+    const formatDate = (date) => {
+      return date.toISOString().replace(/-|:|\.\d\d\d/g, "");
+    };
+
+    const eventTitle = encodeURIComponent(task.name);
+    const eventDescription = encodeURIComponent(task.description || 'Brak opisu.');
+    const eventLocation = encodeURIComponent(task.boardName || 'Brak lokalizacji.');
+
+    const googleCalendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${eventTitle}&dates=${formatDate(startDate)}/${formatDate(endDate)}&details=${eventDescription}&location=${eventLocation}&sf=true&output=xml`;
+
+    Linking.canOpenURL(googleCalendarUrl)
+      .then((supported) => {
+        if (supported) {
+          return Linking.openURL(googleCalendarUrl);
+        } else {
+          Alert.alert('Błąd', 'Nie można otworzyć Kalendarza Google.');
+        }
+      })
+      .catch((err) => console.error('An error occurred', err));
+  };
+
   if (loading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
@@ -304,6 +448,13 @@ export default function CalendarScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Przycisk eksportu do kalendarza systemowego */}
+      <TouchableOpacity 
+        style={[styles.exportButton, { backgroundColor: colors.primary }]}
+        onPress={exportTasksToCalendar}
+      >
+        <Text style={{ color: colors.background, fontWeight: 'bold' }}>Eksportuj do Kalendarza</Text>
+      </TouchableOpacity>
 
       <Calendar
         key={`${colors.background}-${themeVersion}`}
@@ -358,19 +509,19 @@ export default function CalendarScreen() {
                   <View style={styles.taskHeader}>
                     <Text style={[styles.taskName, { color: colors.text }]}>{item.name}</Text>
                     <View style={{ flexDirection: 'row' }}>
-                      {/* Przycisk eksportu do kalendarza systemowego
-                      <IconButton
-                        icon="calendar-export"
-                        size={20}
-                        color={colors.primary}
-                        onPress={() => exportTaskToCalendar(item)}
-                      /> */}
-                      {/* Przycisk eksportu do Kalendarza Google */}
+                      {/* Eksport do Kalendarza Google */}
                       <IconButton
                         icon="google"
                         size={20}
                         color="#DB4437"
                         onPress={() => exportTaskToGoogleCalendar(item)}
+                      />
+                      {/* Eksport do Kalendarza Systemowego */}
+                      <IconButton
+                        icon="calendar-export"
+                        size={20}
+                        color={colors.primary}
+                        onPress={() => exportTaskToCalendar(item)}
                       />
                     </View>
                   </View>
