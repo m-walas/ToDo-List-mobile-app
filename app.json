@@ -15,7 +15,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Aplikacja wymaga dostępu do galerii, aby wybrać obraz."
+        "NSPhotoLibraryUsageDescription": "Aplikacja wymaga dostępu do galerii, aby wybrać obraz.",
+        "NSCalendarsUsageDescription": "Aplikacja wymaga dostępu do kalendarza, aby eksportować zadania."
       }
     },
     "android": {
@@ -23,6 +24,10 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "permissions": [
+        "READ_CALENDAR",
+        "WRITE_CALENDAR"
+      ],
       "package": "com.mwalas.todolistapp"
     },
     "web": {
