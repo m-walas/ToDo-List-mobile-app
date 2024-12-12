@@ -134,7 +134,7 @@ export default function CalendarScreen() {
             boardName: board.name || 'Brak nazwy tablicy',
             deadline: date,
             deadlineDate: new Date(task.deadline),
-            notificationId: task.notificationId || null, // Dodane pole
+            notificationId: task.notificationId || null,
           });
         }
       });
@@ -291,11 +291,11 @@ export default function CalendarScreen() {
   const scheduleNotification = async (task) => {
     try {
       const trigger = new Date(task.deadlineDate);
-      trigger.setDate(trigger.getDate() - 1); // 24 godziny przed
-      trigger.setHours(9, 0, 0); // Możesz dostosować godzinę powiadomienia
+      trigger.setDate(trigger.getDate() - 1); // 24h przed terminem
+      trigger.setHours(9, 0, 0); // godzina wysłania powiadomienia
 
       if (trigger < new Date()) {
-        // Jeśli czas powiadomienia już minął, nie harmonogramuj
+        // Jeśli termin zadania minął, nie harmonogramuj powiadomienia
         return;
       }
 
@@ -346,70 +346,31 @@ export default function CalendarScreen() {
     }
   }, [loading, tasks]);
 
-  // Funkcja do eksportowania wszystkich zadań do kalendarza systemowego
-  const exportTasksToCalendar = async () => {
-    try {
-      // Sprawdzenie uprawnień
-      const status = await CalendarExpo.requestCalendarPermissionsAsync();
-      if (status.status !== 'granted') {
-        Alert.alert('Brak uprawnień', 'Aplikacja nie ma dostępu do kalendarza.');
-        return;
-      }
+  // // Funkcja do eksportowania pojedynczego zadania do kalendarza systemowego
+  // const exportTaskToCalendar = async (task) => {
+  //   try {
+  //     if (!calendarId) {
+  //       Alert.alert('Błąd', 'Kalendarz nie jest dostępny.');
+  //       return;
+  //     }
 
-      // Iteracja przez wszystkie zadania i dodawanie ich do kalendarza
-      for (const task of tasks) {
-        if (!calendarId) {
-          Alert.alert('Błąd', 'Kalendarz nie jest dostępny.');
-          return;
-        }
+  //     const taskDate = new Date(task.deadline);
+  //     taskDate.setHours(9, 0, 0);
 
-        // Konwersja daty na Date object
-        const taskDate = new Date(task.deadline);
-        // Ustawienie czasu na początek dnia
-        taskDate.setHours(9, 0, 0); // Możesz dostosować godzinę
+  //     await CalendarExpo.createEventAsync(calendarId, {
+  //       title: task.name,
+  //       startDate: taskDate,
+  //       endDate: new Date(taskDate.getTime() + 60 * 60 * 1000),
+  //       notes: task.description,
+  //       color: task.color,
+  //     });
 
-        // Dodanie wydarzenia do kalendarza
-        await CalendarExpo.createEventAsync(calendarId, {
-          title: task.name,
-          startDate: taskDate,
-          endDate: new Date(taskDate.getTime() + 60 * 60 * 1000), // 1 godzina później
-          notes: task.description,
-          color: task.color,
-        });
-      }
-
-      Alert.alert('Sukces', 'Wszystkie zadania zostały wyeksportowane do kalendarza.');
-    } catch (error) {
-      console.error('Błąd przy eksportowaniu do kalendarza:', error);
-      Alert.alert('Błąd', 'Nie udało się wyeksportować zadań do kalendarza.');
-    }
-  };
-
-  // Opcjonalnie: Funkcja do eksportowania pojedynczego zadania do kalendarza systemowego
-  const exportTaskToCalendar = async (task) => {
-    try {
-      if (!calendarId) {
-        Alert.alert('Błąd', 'Kalendarz nie jest dostępny.');
-        return;
-      }
-
-      const taskDate = new Date(task.deadline);
-      taskDate.setHours(9, 0, 0);
-
-      await CalendarExpo.createEventAsync(calendarId, {
-        title: task.name,
-        startDate: taskDate,
-        endDate: new Date(taskDate.getTime() + 60 * 60 * 1000),
-        notes: task.description,
-        color: task.color,
-      });
-
-      Alert.alert('Sukces', `Zadanie "${task.name}" zostało wyeksportowane do kalendarza.`);
-    } catch (error) {
-      console.error('Błąd przy eksportowaniu zadania do kalendarza:', error);
-      Alert.alert('Błąd', `Nie udało się wyeksportować zadania "${task.name}".`);
-    }
-  };
+  //     Alert.alert('Sukces', `Zadanie "${task.name}" zostało wyeksportowane do kalendarza.`);
+  //   } catch (error) {
+  //     console.error('Błąd przy eksportowaniu zadania do kalendarza:', error);
+  //     Alert.alert('Błąd', `Nie udało się wyeksportować zadania "${task.name}".`);
+  //   }
+  // };
 
   // Funkcja do eksportowania pojedynczego zadania do Kalendarza Google
   const exportTaskToGoogleCalendar = (task) => {
@@ -448,13 +409,6 @@ export default function CalendarScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Przycisk eksportu do kalendarza systemowego */}
-      <TouchableOpacity 
-        style={[styles.exportButton, { backgroundColor: colors.primary }]}
-        onPress={exportTasksToCalendar}
-      >
-        <Text style={{ color: colors.background, fontWeight: 'bold' }}>Eksportuj do Kalendarza</Text>
-      </TouchableOpacity>
 
       <Calendar
         key={`${colors.background}-${themeVersion}`}
@@ -516,13 +470,13 @@ export default function CalendarScreen() {
                         color="#DB4437"
                         onPress={() => exportTaskToGoogleCalendar(item)}
                       />
-                      {/* Eksport do Kalendarza Systemowego */}
+                      {/* Eksport do Kalendarza Systemowego
                       <IconButton
                         icon="calendar-export"
                         size={20}
                         color={colors.primary}
                         onPress={() => exportTaskToCalendar(item)}
-                      />
+                      /> */}
                     </View>
                   </View>
                   <Text style={[styles.taskDescription, { color: colors.text }]}>
