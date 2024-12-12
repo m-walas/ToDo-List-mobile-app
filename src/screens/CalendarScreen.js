@@ -63,7 +63,7 @@ export default function CalendarScreen() {
   const [availableBoards, setAvailableBoards] = useState([]);
   const [themeVersion, setThemeVersion] = useState(0); // Stan do wymuszenia renderowania
 
-  console.log('Aktualny motyw:', colors);
+  // console.log('Aktualny motyw:', colors);
 
   // Aktualizacja stanu przy zmianie schematu kolorów
   useEffect(() => {

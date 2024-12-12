@@ -20,19 +20,47 @@ import {
   MD3LightTheme as PaperDefaultTheme,
   MD3DarkTheme as PaperDarkTheme,
 } from 'react-native-paper';
-import { useColorScheme } from 'react-native';
 
-import ThemeContext from './src/contexts/ThemeContext';
+import { ThemeProvider, useThemeContext } from './src/contexts/ThemeContext';
 
 // Importujemy UnsubProvider
 import { UnsubProvider } from './src/contexts/UnsubContext';
 
 const Stack = createStackNavigator();
 
-export default function App() {
+const CustomDefaultTheme = {
+  ...NavigationDefaultTheme,
+  ...PaperDefaultTheme,
+  colors: {
+    ...NavigationDefaultTheme.colors,
+    ...PaperDefaultTheme.colors,
+    background: '#ffffff',
+    text: '#24292e',
+    primary: '#0366d6',
+    accent: '#586069',
+    surface: '#f6f8fa',
+  },
+};
+
+const CustomDarkTheme = {
+  ...NavigationDarkTheme,
+  ...PaperDarkTheme,
+  colors: {
+    ...NavigationDarkTheme.colors,
+    ...PaperDarkTheme.colors,
+    background: '#121212',
+    text: '#FFFFFF',
+    primary: '#BB86FC',
+    accent: '#03DAC6',
+    surface: '#1E1E1E',
+  },
+};
+
+function MainApp() {
+  const { isDarkTheme } = useThemeContext();
   const [user, setUser] = useState(null);
-  const colorScheme = useColorScheme();
-  const [isDarkTheme, setIsDarkTheme] = useState(colorScheme === 'dark');
+
+  const theme = isDarkTheme ? CustomDarkTheme : CustomDefaultTheme;
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -41,78 +69,30 @@ export default function App() {
     return unsubscribe;
   }, []);
 
-  const toggleTheme = async () => {
-    const newTheme = !isDarkTheme;
-    setIsDarkTheme(newTheme);
-    try {
-      await AsyncStorage.setItem('theme', newTheme ? 'dark' : 'light');
-    } catch (error) {
-      console.error('Error saving theme preference:', error);
-    }
-  };
-
-  useEffect(() => {
-    const loadTheme = async () => {
-      try {
-        const themePreference = await AsyncStorage.getItem('theme');
-        if (themePreference) {
-          setIsDarkTheme(themePreference === 'dark');
-        }
-      } catch (error) {
-        console.error('Error loading theme preference:', error);
-      }
-    };
-    loadTheme();
-  }, []);
-
-  const CustomDefaultTheme = {
-    ...NavigationDefaultTheme,
-    ...PaperDefaultTheme,
-    colors: {
-      ...NavigationDefaultTheme.colors,
-      ...PaperDefaultTheme.colors,
-      background: '#ffffff',
-      text: '#24292e',
-      primary: '#0366d6',
-      accent: '#586069',
-      surface: '#f6f8fa',
-    },
-  };
-
-  const CustomDarkTheme = {
-    ...NavigationDarkTheme,
-    ...PaperDarkTheme,
-    colors: {
-      ...NavigationDarkTheme.colors,
-      ...PaperDarkTheme.colors,
-      background: '#121212',
-      text: '#FFFFFF',
-      primary: '#BB86FC',
-      accent: '#03DAC6',
-      surface: '#1E1E1E',
-    },
-  };
-
-  const theme = isDarkTheme ? CustomDarkTheme : CustomDefaultTheme;
-
   return (
     <UnsubProvider>
-      <ThemeContext.Provider value={{ isDarkTheme, toggleTheme }}>
-        <PaperProvider theme={theme}>
-          <NavigationContainer theme={theme}>
-            <Stack.Navigator screenOptions={{ headerShown: false }}>
-              {user ? (
-                <Stack.Screen name="Main" component={AppNavigator} />
-              ) : (
-                <>
-                  <Stack.Screen name="Login" component={LoginScreen} />
-                  <Stack.Screen name="Register" component={RegisterScreen} />
-                </>
-              )}
-            </Stack.Navigator>
-          </NavigationContainer>
-        </PaperProvider>
-      </ThemeContext.Provider>
+      <PaperProvider theme={theme}>
+        <NavigationContainer theme={theme}>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            {user ? (
+              <Stack.Screen name="Main" component={AppNavigator} />
+            ) : (
+              <>
+                <Stack.Screen name="Login" component={LoginScreen} />
+                <Stack.Screen name="Register" component={RegisterScreen} />
+              </>
+            )}
+          </Stack.Navigator>
+        </NavigationContainer>
+      </PaperProvider>
     </UnsubProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <MainApp />
+    </ThemeProvider>
   );
 }
