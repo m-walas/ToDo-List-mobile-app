@@ -7,7 +7,9 @@ import {
   Alert, 
   TouchableOpacity, 
   View, 
-  FlatList 
+  FlatList,
+  Platform,
+  Linking
 } from 'react-native';
 import { 
   Text, 
@@ -16,7 +18,8 @@ import {
   Modal, 
   List, 
   Button, 
-  useTheme 
+  useTheme,
+  IconButton
 } from 'react-native-paper';
 import { Calendar } from 'react-native-calendars';
 import { 
@@ -32,6 +35,7 @@ import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LocaleConfig } from 'react-native-calendars';
 import { useColorScheme } from 'react-native';
+import RNCalendarEvents from 'react-native-calendar-events'; // Import biblioteki
 
 LocaleConfig.locales['pl'] = {
   monthNames: [
@@ -52,7 +56,7 @@ LocaleConfig.defaultLocale = 'pl';
 
 export default function CalendarScreen() {
   const { colors } = useTheme();
-  const colorScheme = useColorScheme();
+  const colorScheme = useColorScheme(); // Hook do wykrywania zmian schematu kolorów
   const navigation = useNavigation();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -61,9 +65,9 @@ export default function CalendarScreen() {
   const [moveModalVisible, setMoveModalVisible] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [availableBoards, setAvailableBoards] = useState([]);
-  const [themeVersion, setThemeVersion] = useState(0);
+  const [themeVersion, setThemeVersion] = useState(0); // Stan do wymuszenia renderowania
 
-  // console.log('Aktualny motyw:', colors);
+  console.log('Aktualny motyw:', colors);
 
   // Aktualizacja stanu przy zmianie schematu kolorów
   useEffect(() => {
@@ -98,6 +102,7 @@ export default function CalendarScreen() {
 
       querySnapshot.forEach((docSnap) => {
         const task = docSnap.data();
+        // Filtrujemy tylko niedokończone zadania, posiadające deadline i przypisaną tablicę
         if (!task.deadline || !task.boardId || task.isCompleted) return;
 
         const board = availableBoards.find((b) => b.id === task.boardId);
@@ -141,7 +146,7 @@ export default function CalendarScreen() {
     return () => {
       unsubscribeTasks();
     };
-  }, [availableBoards, colors]);
+  }, [availableBoards, colors]); // Upewnij się, że zależności obejmują cały obiekt 'colors'
 
   // Memoizacja oznaczonych dat
   const markedDates = useMemo(() => {
@@ -164,7 +169,7 @@ export default function CalendarScreen() {
     };
 
     return dates;
-  }, [tasks, colors]);
+  }, [tasks, colors]); // Upewnij się, że zależności obejmują cały obiekt 'colors'
 
   const onDayPress = (day) => {
     setSelectedDate(day.dateString);
@@ -192,6 +197,93 @@ export default function CalendarScreen() {
     setMoveModalVisible(true);
   };
 
+  // Funkcja do eksportowania wszystkich zadań do kalendarza systemowego
+  const exportTasksToCalendar = async () => {
+    try {
+      // Sprawdzenie uprawnień
+      const status = await RNCalendarEvents.requestPermissions();
+      if (status !== 'authorized') {
+        Alert.alert('Brak uprawnień', 'Aplikacja nie ma dostępu do kalendarza.');
+        return;
+      }
+
+      // Iteracja przez wszystkie zadania i dodawanie ich do kalendarza
+      for (const task of tasks) {
+        // Konwersja daty na Date object
+        const taskDate = new Date(task.deadline);
+        // Ustawienie czasu na początek dnia
+        taskDate.setHours(9, 0, 0); // Możesz dostosować godzinę
+
+        // Dodanie wydarzenia do kalendarza
+        await RNCalendarEvents.saveEvent(task.name, {
+          startDate: taskDate.toISOString(),
+          endDate: new Date(taskDate.getTime() + 60 * 60 * 1000).toISOString(), // 1 godzina później
+          notes: task.description,
+          color: task.color,
+          // Możesz dodać więcej opcji, np. kalendarz, który chcesz użyć
+        });
+      }
+
+      Alert.alert('Sukces', 'Wszystkie zadania zostały wyeksportowane do kalendarza.');
+    } catch (error) {
+      console.error('Błąd przy eksportowaniu do kalendarza:', error);
+      Alert.alert('Błąd', 'Nie udało się wyeksportować zadań do kalendarza.');
+    }
+  };
+
+  // Opcjonalnie: Funkcja do eksportowania pojedynczego zadania do kalendarza systemowego
+  const exportTaskToCalendar = async (task) => {
+    try {
+      const status = await RNCalendarEvents.requestPermissions();
+      if (status !== 'authorized') {
+        Alert.alert('Brak uprawnień', 'Aplikacja nie ma dostępu do kalendarza.');
+        return;
+      }
+
+      const taskDate = new Date(task.deadline);
+      taskDate.setHours(9, 0, 0);
+
+      await RNCalendarEvents.saveEvent(task.name, {
+        startDate: taskDate.toISOString(),
+        endDate: new Date(taskDate.getTime() + 60 * 60 * 1000).toISOString(),
+        notes: task.description,
+        color: task.color,
+      });
+
+      Alert.alert('Sukces', `Zadanie "${task.name}" zostało wyeksportowane do kalendarza.`);
+    } catch (error) {
+      console.error('Błąd przy eksportowaniu zadania do kalendarza:', error);
+      Alert.alert('Błąd', `Nie udało się wyeksportować zadania "${task.name}".`);
+    }
+  };
+
+  // Funkcja do eksportowania pojedynczego zadania do Kalendarza Google
+  const exportTaskToGoogleCalendar = (task) => {
+    const startDate = new Date(task.deadline);
+    startDate.setHours(9, 0, 0); // Ustawienie godziny rozpoczęcia
+    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // 1 godzina później
+
+    const formatDate = (date) => {
+      return date.toISOString().replace(/-|:|\.\d\d\d/g,"");
+    };
+
+    const eventTitle = encodeURIComponent(task.name);
+    const eventDescription = encodeURIComponent(task.description || 'Brak opisu.');
+    const eventLocation = encodeURIComponent(task.boardName || 'Brak lokalizacji.');
+
+    const googleCalendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${eventTitle}&dates=${formatDate(startDate)}/${formatDate(endDate)}&details=${eventDescription}&location=${eventLocation}&sf=true&output=xml`;
+
+    Linking.canOpenURL(googleCalendarUrl)
+      .then((supported) => {
+        if (supported) {
+          return Linking.openURL(googleCalendarUrl);
+        } else {
+          Alert.alert('Błąd', 'Nie można otworzyć Kalendarza Google.');
+        }
+      })
+      .catch((err) => console.error('An error occurred', err));
+  };
+
   if (loading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
@@ -202,8 +294,16 @@ export default function CalendarScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Przycisk eksportu do kalendarza systemowego */}
+      <TouchableOpacity 
+        style={[styles.exportButton, { backgroundColor: colors.primary }]}
+        onPress={exportTasksToCalendar}
+      >
+        <Text style={{ color: colors.background, fontWeight: 'bold' }}>Eksportuj do Kalendarza</Text>
+      </TouchableOpacity>
+
       <Calendar
-        key={`${colors.background}-${themeVersion}`}
+        key={`${colors.background}-${themeVersion}`} // Dodanie 'themeVersion' do klucza
         onDayPress={onDayPress}
         markingType={'multi-dot'}
         markedDates={markedDates}
@@ -254,9 +354,22 @@ export default function CalendarScreen() {
                 ]}>
                   <View style={styles.taskHeader}>
                     <Text style={[styles.taskName, { color: colors.text }]}>{item.name}</Text>
-                    <TouchableOpacity onPress={() => openMoveModal(item.id)}>
-                      <Text style={[styles.moveText, { color: colors.primary }]}>Przenieś</Text>
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row' }}>
+                      {/* Przycisk eksportu do kalendarza systemowego */}
+                      <IconButton
+                        icon="calendar-export"
+                        size={20}
+                        color={colors.primary}
+                        onPress={() => exportTaskToCalendar(item)}
+                      />
+                      {/* Przycisk eksportu do Kalendarza Google */}
+                      <IconButton
+                        icon="google"
+                        size={20}
+                        color="#DB4437" // Kolor logo Google
+                        onPress={() => exportTaskToGoogleCalendar(item)}
+                      />
+                    </View>
                   </View>
                   <Text style={[styles.taskDescription, { color: colors.text }]}>
                     {item.description || 'Brak opisu.'}
@@ -339,6 +452,7 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 10,
     borderRadius: 5,
+    // backgroundColor oraz borderLeftColor ustalane dynamicznie z motywu i item.color
   },
   taskHeader: {
     flexDirection: 'row',
@@ -351,6 +465,7 @@ const styles = StyleSheet.create({
   },
   moveText: {
     fontSize: 14,
+    // Kolor ustawiany dynamicznie w kodzie
   },
   taskDescription: {
     fontSize: 14,
@@ -366,12 +481,14 @@ const styles = StyleSheet.create({
     margin: 16,
     right: 0,
     bottom: 0,
+    // Tło fab ustawione dynamicznie
   },
   modalContainer: {
     padding: 20,
     margin: 20,
     borderRadius: 8,
     maxHeight: '80%',
+    // backgroundColor ustawione dynamicznie
   },
   modalTitle: {
     fontSize: 18,
@@ -380,5 +497,11 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     marginTop: 10,
+  },
+  exportButton: {
+    alignSelf: 'flex-end',
+    padding: 10,
+    margin: 10,
+    borderRadius: 5,
   },
 });
