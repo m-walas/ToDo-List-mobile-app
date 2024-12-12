@@ -21,6 +21,7 @@ export default function HomeScreen() {
   const [newTaskBoard, setNewTaskBoard] = useState('');
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskDeadline, setNewTaskDeadline] = useState(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
 
   const user = auth.currentUser;
@@ -102,6 +103,8 @@ export default function HomeScreen() {
     try {
       await addDoc(collection(db, 'tasks'), {
         text: newTaskText,
+        description: newTaskDescription,
+        deadline: newTaskDeadline || null, // Dodano deadline
         userId: user.uid,
         boardId: newTaskBoard,
         isCompleted: false,
@@ -110,13 +113,16 @@ export default function HomeScreen() {
       });
       setNewTaskText('');
       setNewTaskBoard('');
+      setNewTaskDescription('');
+      setNewTaskDeadline(null); // Zresetuj deadline
       setAddTaskDialogVisible(false);
       Alert.alert('Sukces', 'Zadanie zostało dodane.');
     } catch (error) {
       console.error('Error adding task:', error);
       Alert.alert('Błąd', 'Nie udało się dodać zadania.');
     }
-  };
+};
+
 
   return (
     <Provider>
@@ -203,17 +209,25 @@ export default function HomeScreen() {
               {/* Deadline */}
               <View style={styles.rowContainer}>
                 <Text style={[styles.label, { color: colors.text }]}>Deadline</Text>
-                <DateTimePicker
-                  value={newTaskDeadline || new Date()}
-                  mode="date"
-                  display="default"
-                  onChange={(event, selectedDate) => {
-                    if (selectedDate) {
-                      setNewTaskDeadline(selectedDate);
-                    }
-                  }}
-                  style={styles.datePicker}
-                />
+                <Button
+                  onPress={() => setShowDatePicker(true)}
+                  style={styles.dateButton}
+                >
+                  {newTaskDeadline ? newTaskDeadline.toLocaleDateString() : 'Wybierz datę'}
+                </Button>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={newTaskDeadline || new Date()}
+                    mode="date"
+                    display="default"
+                    onChange={(event, selectedDate) => {
+                      setShowDatePicker(false); // Zamknij picker
+                      if (selectedDate) {
+                        setNewTaskDeadline(selectedDate); // Zaktualizuj deadline
+                      }
+                    }}
+                  />
+                )}
               </View>
 
               {/* Wybór tablicy */}

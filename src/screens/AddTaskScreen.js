@@ -1,4 +1,3 @@
-// src/screens/AddTaskScreen.js
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Alert, Platform } from 'react-native';
 import { Text, TextInput, Button, useTheme } from 'react-native-paper';
@@ -68,6 +67,13 @@ export default function AddTaskScreen({ route, navigation }) {
     }
   };
 
+  const onDateChange = (event, selectedDate) => {
+    setShowDatePicker(false); // Zamknij picker
+    if (selectedDate) {
+      setDeadline(selectedDate); // Ustaw wybraną datę jako deadline
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <Text style={[styles.label, { color: colors.text }]}>Tytuł Zadania</Text>
@@ -91,17 +97,17 @@ export default function AddTaskScreen({ route, navigation }) {
 
       <View style={styles.deadlineContainer}>
         <Text style={[styles.label, { color: colors.text }]}>Deadline</Text>
-        <DateTimePicker
-          value={deadline || new Date()}
-          mode="date"
-          display="default"
-          onChange={(event, selectedDate) => {
-            if (selectedDate) {
-              setDeadline(selectedDate); // Ustaw wybraną datę jako deadline
-            }
-          }}
-          style={styles.datePicker} // Stylizacja dla estetycznego dopasowania
-        />
+        <Button onPress={() => setShowDatePicker(true)} style={styles.dateButton}>
+          {deadline ? deadline.toLocaleDateString() : 'Wybierz datę'}
+        </Button>
+        {showDatePicker && (
+          <DateTimePicker
+            value={deadline || new Date()}
+            mode="date"
+            display="default"
+            onChange={onDateChange}
+          />
+        )}
       </View>
 
       <Text style={[styles.label, { color: colors.text }]}>Wybierz Tablicę</Text>
@@ -156,9 +162,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 15,
   },
-  datePicker: {
+  dateButton: {
     marginLeft: 10,
-    flex: 1,
   },
   pickerContainer: {
     borderWidth: 1,

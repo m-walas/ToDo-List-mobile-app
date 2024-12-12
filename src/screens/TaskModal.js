@@ -1,4 +1,3 @@
-// src/components/TaskModal.js
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Alert, Platform, View } from 'react-native';
 import { Button, useTheme, Modal, Portal, TextInput, Text } from 'react-native-paper'; // Dodano Text
@@ -14,6 +13,7 @@ export default function TaskModal({ route, navigation }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [deadline, setDeadline] = useState(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedBoard, setSelectedBoard] = useState('');
   const [boards, setBoards] = useState([]);
 
@@ -107,8 +107,7 @@ export default function TaskModal({ route, navigation }) {
 
   return (
     <Portal>
-      <Modal visible={true} onDismiss={() => navigation.goBack()} contentContainerStyle={[styles.container, { backgroundColor: colors.surface }]}>
-        
+      <Modal visible={true} onDismiss={() => navigation.goBack()} contentContainerStyle={[styles.container, { backgroundColor: colors.surface }]}>        
         {/* Tytuł */}
         <View style={styles.inputContainer}>
           <Text style={[styles.label, { color: colors.text }]}>Tytuł</Text>
@@ -137,17 +136,26 @@ export default function TaskModal({ route, navigation }) {
         {/* Deadline */}
         <View style={styles.rowContainer}>
           <Text style={[styles.label, { color: colors.text }]}>Deadline</Text>
-          <DateTimePicker
-            value={deadline || new Date()}
-            mode="date"
-            display="default"
-            onChange={(event, selectedDate) => {
-              if (selectedDate) {
-                setDeadline(selectedDate); // Ustaw wybraną datę
-              }
-            }}
-            style={styles.datePicker}
-          />
+          <Button
+            onPress={() => setShowDatePicker(true)}
+            style={styles.dateButton}
+          >
+            {deadline ? deadline.toLocaleDateString() : 'Wybierz datę'}
+          </Button>
+          {showDatePicker && (
+            <DateTimePicker
+              value={deadline || new Date()}
+              mode="date"
+              display="default"
+              onChange={(event, selectedDate) => {
+                setShowDatePicker(false);
+                if (selectedDate) {
+                  setDeadline(selectedDate);
+                }
+              }}
+              style={styles.datePicker}
+            />
+          )}
         </View>
         {/* Tablica */}
         {boards.length > 0 && (
@@ -210,9 +218,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     borderColor: '#ccc',
   },
-  datePicker: {
-    marginTop: 5,
-  },
   button: {
     marginTop: 10,
   },
@@ -225,5 +230,8 @@ const styles = StyleSheet.create({
   datePicker: {
     flex: 1,
     alignSelf: 'flex-end',
+  },
+  dateButton: {
+    marginTop: 5,
   },
 });
