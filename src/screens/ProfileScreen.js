@@ -1,4 +1,5 @@
 // src/screens/ProfileScreen.js
+
 import React, { useContext, useState, useEffect } from 'react';
 import { View, StyleSheet, Alert, ScrollView } from 'react-native';
 import { Text, Button, useTheme, TextInput, Switch, List } from 'react-native-paper';
@@ -29,6 +30,7 @@ export default function ProfileScreen() {
         }
       } catch (error) {
         console.error('Error fetching user profile:', error);
+        Alert.alert('Błąd', 'Nie udało się pobrać danych użytkownika.');
       }
     };
     fetchUserProfile();
@@ -61,6 +63,7 @@ export default function ProfileScreen() {
               await auth.signOut();
             } catch (error) {
               console.error('Error signing out:', error);
+              Alert.alert('Błąd', 'Nie udało się wylogować.');
             }
           },
         },
@@ -77,6 +80,8 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
+
+        <Text style={[styles.title, { color: colors.text }]}>GitHub ToDo List</Text>
 
         <View style={styles.infoSection}>
           <TextInput
@@ -145,9 +150,18 @@ const styles = StyleSheet.create({
   scrollContainer: {
     padding: 20,
     alignItems: 'center',
+    paddingTop: 20,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginTop: 30,
+    marginBottom: 30,
+    textAlign: 'center',
   },
   infoSection: {
     width: '100%',
+    marginTop: 70,
     marginBottom: 40,
   },
   input: {
@@ -161,7 +175,8 @@ const styles = StyleSheet.create({
   },
   settingsSection: {
     width: '100%',
-    marginBottom: 40,
+    marginTop: 150,
+    marginBottom: 0,
   },
   listItem: {
     backgroundColor: 'transparent',
@@ -169,6 +184,7 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     width: '100%',
+    marginTop: 10,
     paddingVertical: 10,
     borderRadius: 25,
     borderColor: '#B00020',

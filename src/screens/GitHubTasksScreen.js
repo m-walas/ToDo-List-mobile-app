@@ -1,3 +1,5 @@
+// src/screens/GitHubTasksScreen.js
+
 import React, { useState, useEffect } from 'react';
 import { 
   View, 
@@ -30,6 +32,10 @@ const GitHubTasksScreen = () => {
   const [newIssueTitle, setNewIssueTitle] = useState('');
   const [newIssueBody, setNewIssueBody] = useState('');
 
+  // Stany dla pull-to-refresh
+  const [isRefreshingRepos, setIsRefreshingRepos] = useState(false);
+  const [isRefreshingIssues, setIsRefreshingIssues] = useState(false);
+
   const handleGitHubLogin = async () => {
     const authUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(
       REDIRECT_URI
@@ -44,30 +50,35 @@ const GitHubTasksScreen = () => {
 
       if (code) {
         // Wymień code na access_token
-        const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
-          method: 'POST',
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            client_id: GITHUB_CLIENT_ID,
-            client_secret: GITHUB_CLIENT_SECRET,
-            code,
-            redirect_uri: REDIRECT_URI,
-          }),
-        });
+        try {
+          const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              client_id: GITHUB_CLIENT_ID,
+              client_secret: GITHUB_CLIENT_SECRET,
+              code,
+              redirect_uri: REDIRECT_URI,
+            }),
+          });
 
-        const data = await tokenResponse.json();
+          const data = await tokenResponse.json();
 
-        if (data.access_token) {
-          // Ustaw token GitHub i zaloguj do Firebase
-          setGithubToken(data.access_token);
-          const credential = GithubAuthProvider.credential(data.access_token);
-          await signInWithCredential(auth, credential);
-          Alert.alert('Success', 'You are now logged in with GitHub!');
-        } else {
-          Alert.alert('Error', 'Failed to retrieve access token');
+          if (data.access_token) {
+            // Ustaw token GitHub i zaloguj do Firebase
+            setGithubToken(data.access_token);
+            const credential = GithubAuthProvider.credential(data.access_token);
+            await signInWithCredential(auth, credential);
+            Alert.alert('Success', 'You are now logged in with GitHub!');
+          } else {
+            Alert.alert('Error', 'Failed to retrieve access token');
+          }
+        } catch (error) {
+          console.error('Error exchanging code for token:', error);
+          Alert.alert('Błąd', 'Wystąpił problem podczas logowania.');
         }
       }
     }
@@ -212,7 +223,14 @@ const GitHubTasksScreen = () => {
             <Text style={styles.repoDesc}>{item.description || 'No description'}</Text>
           </TouchableOpacity>
         )}
+        refreshing={isRefreshingRepos}
+        onRefresh={refreshRepos}
+        ListEmptyComponent={<Text style={styles.infoText}>No repositories found.</Text>}
       />
+      {/* Opcjonalnie: Przyciski odświeżania */}
+      <TouchableOpacity style={styles.refreshButton} onPress={refreshRepos}>
+        <Text style={styles.refreshButtonText}>⟳ Refresh Repos</Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -243,39 +261,43 @@ const GitHubTasksScreen = () => {
         <Text style={styles.createIssueButtonText}>+ Create Issue</Text>
       </TouchableOpacity>
 
-      {issues.length === 0 ? (
-        <Text style={styles.infoText}>No issues found.</Text>
-      ) : (
-        <FlatList
-          data={issues}
-          keyExtractor={(item) => item.id.toString()}
-          style={{marginTop: 10}}
-          renderItem={({ item }) => (
-            <View style={styles.issueItem}>
-              <View style={styles.issueHeader}>
-                <Text style={styles.issueTitle}>#{item.number} {item.title}</Text>
-                {item.state === 'open' ? (
-                  <TouchableOpacity 
-                    style={styles.closeButton} 
-                    onPress={() => closeIssue(item.number)}
-                  >
-                    <Text style={styles.closeButtonText}>Close</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <Text style={styles.closedLabel}>Closed</Text>
-                )}
-              </View>
-              {item.body ? (
-                <Text style={styles.issueBody}>
-                  {item.body.length > 120 ? item.body.slice(0,120)+'...' : item.body}
-                </Text>
+      <FlatList
+        data={issues}
+        keyExtractor={(item) => item.id.toString()}
+        style={{ marginTop: 10 }}
+        renderItem={({ item }) => (
+          <View style={styles.issueItem}>
+            <View style={styles.issueHeader}>
+              <Text style={styles.issueTitle}>#{item.number} {item.title}</Text>
+              {item.state === 'open' ? (
+                <TouchableOpacity 
+                  style={styles.closeButton} 
+                  onPress={() => closeIssue(item.number)}
+                >
+                  <Text style={styles.closeButtonText}>Close</Text>
+                </TouchableOpacity>
               ) : (
-                <Text style={styles.issueBodyEmpty}>No description</Text>
+                <Text style={styles.closedLabel}>Closed</Text>
               )}
             </View>
-          )}
-        />
-      )}
+            {item.body ? (
+              <Text style={styles.issueBody}>
+                {item.body.length > 120 ? item.body.slice(0, 120) + '...' : item.body}
+              </Text>
+            ) : (
+              <Text style={styles.issueBodyEmpty}>No description</Text>
+            )}
+          </View>
+        )}
+        refreshing={isRefreshingIssues}
+        onRefresh={refreshIssues}
+        ListEmptyComponent={<Text style={styles.infoText}>No issues found.</Text>}
+      />
+
+      {/* Opcjonalnie: Przyciski odświeżania */}
+      <TouchableOpacity style={styles.refreshButton} onPress={refreshIssues}>
+        <Text style={styles.refreshButtonText}>⟳ Refresh Issues</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.backButton} onPress={() => {
         setSelectedRepo(null);
@@ -285,6 +307,33 @@ const GitHubTasksScreen = () => {
       </TouchableOpacity>
     </View>
   );
+
+  // Implementacja funkcji odświeżania
+  const refreshRepos = async () => {
+    if (!githubToken) return;
+    setIsRefreshingRepos(true);
+    try {
+      await fetchRepos();
+    } catch (error) {
+      console.error('Error refreshing repos:', error);
+      Alert.alert('Błąd', 'Nie udało się odświeżyć repozytoriów.');
+    } finally {
+      setIsRefreshingRepos(false);
+    }
+  };
+
+  const refreshIssues = async () => {
+    if (!selectedRepo) return;
+    setIsRefreshingIssues(true);
+    try {
+      await fetchIssues(selectedRepo.owner.login, selectedRepo.name, issueState);
+    } catch (error) {
+      console.error('Error refreshing issues:', error);
+      Alert.alert('Błąd', 'Nie udało się odświeżyć zgłoszeń.');
+    } finally {
+      setIsRefreshingIssues(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -309,7 +358,7 @@ const GitHubTasksScreen = () => {
               onChangeText={setNewIssueTitle}
             />
             <TextInput
-              style={[styles.input, {height:100}]}
+              style={[styles.input, { height: 100 }]}
               placeholder="Issue Description"
               multiline
               value={newIssueBody}
@@ -317,12 +366,12 @@ const GitHubTasksScreen = () => {
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity 
-                style={[styles.modalButton, {backgroundColor:'#28a745'}]} 
+                style={[styles.modalButton, { backgroundColor: '#28a745' }]} 
                 onPress={createIssue}>
                 <Text style={styles.modalButtonText}>Create</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.modalButton, {backgroundColor:'#d73a49'}]} 
+                style={[styles.modalButton, { backgroundColor: '#d73a49' }]} 
                 onPress={() => setCreateIssueModalVisible(false)}>
                 <Text style={styles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -332,7 +381,7 @@ const GitHubTasksScreen = () => {
       </Modal>
       
       {!githubToken && (
-        <View style={{alignItems:'center', marginTop:40}}>
+        <View style={{ alignItems: 'center', marginTop: 40 }}>
           <Text style={styles.infoText}>Please log in to proceed.</Text>
         </View>
       )}
@@ -362,189 +411,201 @@ const styles = StyleSheet.create({
     backgroundColor: '#0366d6',
     borderRadius: 5,
     paddingVertical: 10,
-    paddingHorizontal:20
+    paddingHorizontal: 20
   },
   loginButtonText: {
-    color:'#fff',
-    fontSize:16,
-    fontWeight:'600'
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600'
   },
   fetchButton: {
     backgroundColor: '#28a745',
     borderRadius: 5,
     paddingVertical: 10,
-    paddingHorizontal:20
+    paddingHorizontal: 20
   },
   fetchButtonText: {
-    color:'#fff',
-    fontSize:16,
-    fontWeight:'600'
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600'
   },
   repoListContainer: {
     flex: 1,
-    padding:16
+    padding: 16
   },
   sectionTitle: {
-    fontSize:20,
-    fontWeight:'700',
-    color:'#24292e',
-    marginBottom:10
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#24292e',
+    marginBottom: 10
   },
   repoItem: {
-    backgroundColor:'#fff',
-    padding:15,
-    borderRadius:5,
-    marginBottom:10,
-    borderWidth:1,
-    borderColor:'#e1e4e8'
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 5,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e1e4e8'
   },
   repoName: {
-    fontSize:18,
-    fontWeight:'600',
-    marginBottom:5,
-    color:'#0366d6'
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 5,
+    color: '#0366d6'
   },
   repoDesc: {
-    fontSize:14,
-    color:'#586069'
+    fontSize: 14,
+    color: '#586069'
   },
   issuesContainer: {
-    flex:1,
-    padding:16
+    flex: 1,
+    padding: 16
   },
   toggleContainer: {
-    flexDirection:'row',
-    marginVertical:10
+    flexDirection: 'row',
+    marginVertical: 10
   },
   toggleButton: {
-    flex:1,
-    backgroundColor:'#e1e4e8',
-    marginRight:10,
-    paddingVertical:10,
-    borderRadius:5,
-    alignItems:'center'
+    flex: 1,
+    backgroundColor: '#e1e4e8',
+    marginRight: 10,
+    paddingVertical: 10,
+    borderRadius: 5,
+    alignItems: 'center'
   },
   toggleButtonActive: {
-    backgroundColor:'#0366d6'
+    backgroundColor: '#0366d6'
   },
   toggleButtonText: {
-    color:'#24292e',
-    fontSize:16,
-    fontWeight:'600'
+    color: '#24292e',
+    fontSize: 16,
+    fontWeight: '600'
   },
   toggleButtonTextActive: {
-    color:'#fff'
+    color: '#fff'
   },
   createIssueButton: {
-    backgroundColor:'#28a745',
-    padding:10,
-    borderRadius:5,
-    alignItems:'center',
-    marginBottom:10
+    backgroundColor: '#28a745',
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginBottom: 10
   },
   createIssueButtonText: {
-    color:'#fff',
-    fontSize:16,
-    fontWeight:'600'
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600'
   },
   infoText: {
-    fontSize:16,
-    color:'#24292e',
-    textAlign:'center',
-    marginTop:10
+    fontSize: 16,
+    color: '#24292e',
+    textAlign: 'center',
+    marginTop: 10
   },
   issueItem: {
-    backgroundColor:'#fff',
-    padding:15,
-    borderRadius:5,
-    marginBottom:10,
-    borderWidth:1,
-    borderColor:'#e1e4e8'
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 5,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e1e4e8'
   },
   issueHeader: {
-    flexDirection:'row',
-    justifyContent:'space-between',
-    alignItems:'center',
-    marginBottom:5
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5
   },
   issueTitle: {
-    fontSize:16,
-    fontWeight:'700',
-    color:'#24292e'
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#24292e'
   },
   closeButton: {
-    backgroundColor:'#d73a49',
-    borderRadius:5,
-    paddingVertical:5,
-    paddingHorizontal:10
+    backgroundColor: '#d73a49',
+    borderRadius: 5,
+    paddingVertical: 5,
+    paddingHorizontal: 10
   },
   closeButtonText: {
-    color:'#fff',
-    fontSize:14,
-    fontWeight:'600'
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600'
   },
   closedLabel: {
-    color:'#d73a49',
-    fontWeight:'700'
+    color: '#d73a49',
+    fontWeight: '700'
   },
   issueBody: {
-    fontSize:14,
-    color:'#586069'
+    fontSize: 14,
+    color: '#586069'
   },
   issueBodyEmpty: {
-    fontSize:14,
-    fontStyle:'italic',
-    color:'#586069'
+    fontSize: 14,
+    fontStyle: 'italic',
+    color: '#586069'
   },
   backButton: {
-    marginTop:20,
-    alignSelf:'flex-start'
+    marginTop: 20,
+    alignSelf: 'flex-start'
   },
   backButtonText: {
-    fontSize:16,
-    color:'#0366d6'
+    fontSize: 16,
+    color: '#0366d6'
   },
   modalOverlay: {
-    flex:1,
-    backgroundColor:'rgba(0,0,0,0.5)',
-    justifyContent:'center',
-    alignItems:'center'
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   modalContainer: {
-    backgroundColor:'#fff',
-    width:'80%',
-    padding:20,
-    borderRadius:10
+    backgroundColor: '#fff',
+    width: '80%',
+    padding: 20,
+    borderRadius: 10
   },
   modalTitle: {
-    fontSize:20,
-    fontWeight:'bold',
-    marginBottom:15,
-    color:'#24292e'
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#24292e'
   },
   input: {
-    borderWidth:1,
-    borderColor:'#e1e4e8',
-    borderRadius:5,
-    padding:10,
-    marginBottom:15,
-    backgroundColor:'#fafbfc'
+    borderWidth: 1,
+    borderColor: '#e1e4e8',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 15,
+    backgroundColor: '#fafbfc'
   },
   modalButtons: {
-    flexDirection:'row',
-    justifyContent:'space-between'
+    flexDirection: 'row',
+    justifyContent: 'space-between'
   },
   modalButton: {
-    padding:10,
-    borderRadius:5,
-    width:'45%',
-    alignItems:'center'
+    padding: 10,
+    borderRadius: 5,
+    width: '45%',
+    alignItems: 'center'
   },
   modalButtonText: {
-    color:'#fff',
-    fontSize:16,
-    fontWeight:'600'
-  }
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600'
+  },
+  refreshButton: {
+    backgroundColor: '#0366d6',
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  refreshButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });
 
 export default GitHubTasksScreen;
