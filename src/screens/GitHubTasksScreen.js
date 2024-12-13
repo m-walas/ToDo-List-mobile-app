@@ -13,10 +13,10 @@ import {
 } from 'react-native';
 import * as AuthSession from 'expo-auth-session';
 import { auth } from '../firebase';
-import { GithubAuthProvider, signInWithCredential } from 'firebase/auth';
+import { GithubAuthProvider, signInWithCredential, linkWithCredential, getAdditionalUserInfo } from 'firebase/auth';
 import { GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET } from '@env';
 import * as WebBrowser from 'expo-web-browser';
-import { useTheme, Provider as PaperProvider } from 'react-native-paper';
+import { useTheme } from 'react-native-paper';
 
 const REDIRECT_URI = AuthSession.makeRedirectUri({ scheme: 'todolistmobileapp' });
 
@@ -39,20 +39,20 @@ const GitHubTasksScreen = () => {
   const [isRefreshingIssues, setIsRefreshingIssues] = useState(false);
 
   const handleGitHubLogin = async () => {
-    const authUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(
-      REDIRECT_URI
-    )}&scope=repo`;
+    try {
+      const authUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(
+        REDIRECT_URI
+      )}&scope=repo`;
 
-    const result = await WebBrowser.openAuthSessionAsync(authUrl, REDIRECT_URI);
-    console.log('WebBrowser result:', result);
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, REDIRECT_URI);
+      console.log('WebBrowser result:', result);
 
-    if (result.type === 'success' && result.url) {
-      const params = new URLSearchParams(result.url.split('?')[1]);
-      const code = params.get('code');
+      if (result.type === 'success' && result.url) {
+        const params = new URLSearchParams(result.url.split('?')[1]);
+        const code = params.get('code');
 
-      if (code) {
-        // Wymień code na access_token
-        try {
+        if (code) {
+          // Wymień code na access_token
           const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
             method: 'POST',
             headers: {
@@ -70,19 +70,46 @@ const GitHubTasksScreen = () => {
           const data = await tokenResponse.json();
 
           if (data.access_token) {
-            // Ustaw token GitHub i zaloguj do Firebase
             setGithubToken(data.access_token);
             const credential = GithubAuthProvider.credential(data.access_token);
-            await signInWithCredential(auth, credential);
-            Alert.alert('Success', 'You are now logged in with GitHub!');
+
+            if (auth.currentUser) {
+              // Użytkownik jest już zalogowany, spróbuj połączyć konto GitHub z istniejącym kontem
+              try {
+                await linkWithCredential(auth.currentUser, credential);
+                Alert.alert('Sukces', 'Konto GitHub zostało pomyślnie połączone z kontem.');
+              } catch (linkError) {
+                if (linkError.code === 'auth/credential-already-in-use') {
+                  Alert.alert('Error', 'To konto GitHub jest już połączone z innym kontem.');
+                } else {
+                  console.error('Error linking GitHub credential:', linkError);
+                  Alert.alert('Error', 'Wystąpił błąd podczas łączenia konta GitHub.');
+                }
+              }
+            } else {
+              // Użytkownik nie jest zalogowany, zaloguj się lub utwórz nowe konto za pomocą GitHub
+              try {
+                const userCredential = await signInWithCredential(auth, credential);
+                const isNewUser = getAdditionalUserInfo(userCredential)?.isNewUser;
+
+                if (isNewUser) {
+                  Alert.alert('Sukces', 'Konto utworzone pomyślnie za pomocą GitHub!');
+                } else {
+                  Alert.alert('Sukces', 'Zalogowano pomyślnie za pomocą GitHub!');
+                }
+              } catch (signInError) {
+                console.error('Error signing in with GitHub credential:', signInError);
+                Alert.alert('Error', 'Wystąpił błąd podczas logowania za pomocą GitHub.');
+              }
+            }
           } else {
-            Alert.alert('Error', 'Failed to retrieve access token');
+            Alert.alert('Error', 'Wystąpił błąd podczas otrzymywania tokena dostępu.');
           }
-        } catch (error) {
-          console.error('Error exchanging code for token:', error);
-          Alert.alert('Błąd', 'Wystąpił problem podczas logowania.');
         }
       }
+    } catch (error) {
+      console.error('Error during GitHub login:', error);
+      Alert.alert('Error', 'Wystąpił błąd podczas logowania za pomocą GitHub.');
     }
   };
 
@@ -99,11 +126,11 @@ const GitHubTasksScreen = () => {
       if (Array.isArray(data)) {
         setRepos(data);
       } else {
-        Alert.alert('Error', 'Failed to fetch repositories.');
+        Alert.alert('Error', 'Błąd podczas pobierania repozytoriów.');
       }
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'Something went wrong while fetching repos.');
+      Alert.alert('Error', 'Wystąpił błąd podczas pobierania repozytoriów.');
     } finally {
       setIsRefreshingRepos(false);
     }
@@ -122,11 +149,11 @@ const GitHubTasksScreen = () => {
       if (Array.isArray(data)) {
         setIssues(data);
       } else {
-        Alert.alert('Error', 'Failed to fetch issues.');
+        Alert.alert('Error', 'Wystąpił błąd podczas pobierania zgłoszeń.');
       }
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'Something went wrong while fetching issues.');
+      Alert.alert('Error', 'Wystąpił błąd podczas pobierania zgłoszeń.');
     } finally {
       setIsRefreshingIssues(false);
     }
@@ -161,11 +188,11 @@ const GitHubTasksScreen = () => {
         // Odśwież listę issues
         fetchIssues(owner.login, name, issueState);
       } else {
-        Alert.alert('Error', 'Failed to create issue.');
+        Alert.alert('Error', 'Wystąpił błąd podczas tworzenia zgłoszenia.');
       }
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'Something went wrong while creating issue.');
+      Alert.alert('Error', 'Wystąpił błąd podczas tworzenia zgłoszenia.');
     }
   };
 
@@ -189,11 +216,11 @@ const GitHubTasksScreen = () => {
         // Odśwież listę issues
         fetchIssues(owner.login, name, issueState);
       } else {
-        Alert.alert('Error', 'Failed to close issue.');
+        Alert.alert('Error', 'Wystąpił błąd podczas zamykania zgłoszenia.');
       }
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'Something went wrong while closing issue.');
+      Alert.alert('Error', 'Wystąpił błąd podczas zamykania zgłoszenia.');
     }
   };
 
@@ -228,7 +255,7 @@ const GitHubTasksScreen = () => {
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.repoItem} onPress={() => selectRepo(item)}>
             <Text style={styles.repoName}>{item.name}</Text>
-            <Text style={styles.repoDesc}>{item.description || 'No description'}</Text>
+            <Text style={styles.repoDesc}>{item.description || 'Brak opisu'}</Text>
           </TouchableOpacity>
         )}
         refreshing={isRefreshingRepos}
