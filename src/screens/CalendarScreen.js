@@ -31,7 +31,7 @@ import {
   updateDoc 
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LocaleConfig } from 'react-native-calendars';
 import { useColorScheme } from 'react-native';
@@ -168,23 +168,32 @@ export default function CalendarScreen() {
       dates[task.deadline].dots.push({ color: task.color });
     });
 
-    // Dzisiejsza data wyróżniona
-    const today = new Date().toISOString().split('T')[0];
-    dates[today] = {
-      ...(dates[today] || {}),
-      selected: true,
-      selectedColor: colors.primary,
-      selectedTextColor: colors.background,
-    };
+    if (selectedDate) {
+      dates[selectedDate] = {
+        ...(dates[selectedDate] || {}),
+        selected: true,
+        selectedColor: colors.primary,
+        selectedTextColor: colors.background,
+      };
+    }
 
     return dates;
-  }, [tasks, colors]);
+  }, [tasks, colors, selectedDate]);
 
   const onDayPress = (day) => {
     setSelectedDate(day.dateString);
     const tasksForDay = tasks.filter(task => task.deadline === day.dateString);
     setTasksForSelectedDate(tasksForDay);
   };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const today = new Date().toISOString().split('T')[0];
+      setSelectedDate(today);
+      const tasksForDay = tasks.filter(task => task.deadline === today);
+      setTasksForSelectedDate(tasksForDay);
+    }, [tasks])
+  );
 
   const moveTaskHandler = async (newBoardId) => {
     try {
@@ -479,13 +488,13 @@ export default function CalendarScreen() {
                         color="#DB4437"
                         onPress={() => exportTaskToGoogleCalendar(item)}
                       />
-                      {/* Eksport do Kalendarza Systemowego */}
+                      {/* Eksport do Kalendarza Systemowego
                       <IconButton
                         icon="calendar-export"
                         size={20}
                         color={colors.primary}
                         onPress={() => exportTaskToCalendar(item)}
-                      />
+                      /> */}
                     </View>
                   </View>
                   <Text style={[styles.taskDescription, { color: colors.text }]}>

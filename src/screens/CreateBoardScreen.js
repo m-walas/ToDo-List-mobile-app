@@ -1,11 +1,9 @@
 // src/screens/CreateBoardScreen.js
 import React, { useState } from 'react';
-import { View, StyleSheet, Image, TouchableOpacity, Alert, FlatList } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Alert, FlatList } from 'react-native';
 import { Text, TextInput, Button, useTheme, Dialog, Portal } from 'react-native-paper';
 import { collection, addDoc } from 'firebase/firestore';
-import { auth, db, storage } from '../firebase';
-import * as ImagePicker from 'expo-image-picker';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { auth, db } from '../firebase';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/colors';
 
@@ -13,41 +11,8 @@ export default function CreateBoardScreen({ navigation }) {
   const { colors } = useTheme();
   const [name, setName] = useState('');
   const [color, setColor] = useState(COLORS[0]);
-  const [coverImage, setCoverImage] = useState(null);
   const [dialogVisible, setDialogVisible] = useState(false);
 
-  const pickImage = async () => {
-    try {
-      console.log('Requesting permissions...');
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      console.log('Permission result:', permissionResult);
-  
-      if (permissionResult.status !== 'granted') {
-        Alert.alert('Błąd', 'Aplikacja nie ma uprawnień do galerii.');
-        return;
-      }
-  
-      console.log('Launching image picker...');
-      let result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 1,
-      });
-  
-      console.log('Image picker result:', result);
-  
-      if (!result.canceled) {
-        setCoverImage(result.assets[0].uri);
-        console.log('Selected image URI:', result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error('Error in pickImage:', error);
-      Alert.alert('Błąd', 'Wystąpił problem podczas wybierania obrazu.');
-    }
-  };
-  
-  
 
   const createBoard = async () => {
     if (name.trim() === '') {
@@ -59,31 +24,12 @@ export default function CreateBoardScreen({ navigation }) {
       Alert.alert('Błąd', 'Użytkownik nie jest zalogowany.');
       return;
     }
-  
-    let coverImageURL = null;
-    if (coverImage) {
-      try {
-        console.log('Fetching image...');
-        const response = await fetch(coverImage);
-        const blob = await response.blob();
-        console.log('Uploading image to Firebase Storage...');
-        const storageRef = ref(storage, `boardCovers/${auth.currentUser.uid}/${Date.now()}`);
-        await uploadBytes(storageRef, blob);
-        coverImageURL = await getDownloadURL(storageRef);
-        console.log('Image uploaded successfully:', coverImageURL);
-      } catch (error) {
-        console.error('Error uploading cover image:', error);
-        Alert.alert('Błąd', 'Nie udało się załadować obrazu.');
-        return;
-      }
-    }
-  
+
     try {
       console.log('Creating board in Firestore...');
       await addDoc(collection(db, 'boards'), {
         name,
         color,
-        coverImage: coverImageURL,
         userId: auth.currentUser.uid,
       });
       Alert.alert('Sukces', 'Tablica została stworzona.');
@@ -139,18 +85,6 @@ export default function CreateBoardScreen({ navigation }) {
         </Dialog>
       </Portal>
 
-      <Text style={[styles.label, { color: colors.text }]}>Okładka tablicy</Text>
-      <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
-        {coverImage ? (
-          <Image source={{ uri: coverImage }} style={styles.coverImage} />
-        ) : (
-          <Text style={{ color: colors.placeholder || '#888' }}>Wybierz obraz</Text>
-        )}
-      </TouchableOpacity>
-
-
-
-
       <Button mode="contained" onPress={createBoard} style={styles.button} color={colors.primary}>
         Stwórz tablicę
       </Button>
@@ -201,21 +135,6 @@ const styles = StyleSheet.create({
   },
   colorsContainer: {
     justifyContent: 'center',
-  },
-  imagePicker: {
-    width: '100%',
-    height: 150,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  coverImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 8,
   },
   button: {
     marginTop: 20,
