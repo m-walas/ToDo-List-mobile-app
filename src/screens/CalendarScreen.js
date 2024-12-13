@@ -5,7 +5,6 @@ import {
   StyleSheet, 
   ActivityIndicator, 
   Alert, 
-  TouchableOpacity, 
   View, 
   FlatList,
   Platform,
@@ -107,19 +106,30 @@ export default function CalendarScreen() {
         if (!board) return;
 
         let date;
+        let deadlineDate;
         try {
           if (typeof task.deadline.toDate === 'function') {
             // Timestamp Firestore
-            date = task.deadline.toDate().toISOString().split('T')[0];
+            deadlineDate = task.deadline.toDate();
           } else if (task.deadline instanceof Date) {
             // JavaScript Date
-            date = task.deadline.toISOString().split('T')[0];
+            deadlineDate = task.deadline;
           } else if (typeof task.deadline === 'string') {
             // String
-            date = new Date(task.deadline).toISOString().split('T')[0];
+            deadlineDate = new Date(task.deadline);
+            if (isNaN(deadlineDate)) throw new Error('Nieprawidłowa data');
           } else {
             throw new Error('Nieznany format daty deadline');
           }
+
+          // Sprawdzenie, czy deadlineDate jest prawidłowym Date
+          if (isNaN(deadlineDate.getTime())) {
+            throw new Error('Invalid Date');
+          }
+
+          date = deadlineDate.toISOString().split('T')[0];
+
+          console.log(`Zadanie: ${task.text}, Deadline: ${task.deadline}, deadlineDate: ${deadlineDate}`);
         } catch (error) {
           console.warn(`Błąd przy konwersji daty dla zadania ID: ${docSnap.id}`, error);
           return;
@@ -133,7 +143,7 @@ export default function CalendarScreen() {
             description: task.description || '',
             boardName: board.name || 'Brak nazwy tablicy',
             deadline: date,
-            deadlineDate: new Date(task.deadline),
+            deadlineDate: deadlineDate,
             notificationId: task.notificationId || null,
           });
         }
@@ -296,9 +306,13 @@ export default function CalendarScreen() {
     try {
       const trigger = new Date(task.deadlineDate);
       trigger.setDate(trigger.getDate() - 1);
-      trigger.setHours(9, 0, 0); // Ustawienie godziny powiadomienia
+      trigger.setHours(2, 43, 0); // Ustawienie godziny powiadomienia na 3:00 AM
+
+      console.log('Harmonogramowanie powiadomienia dla zadania:', task.name);
+      console.log('Data i czas powiadomienia:', trigger.toString());
 
       if (trigger < new Date()) {
+        console.log('Czas powiadomienia już minął. Pomijanie powiadomienia.');
         return;
       }
 
@@ -308,8 +322,10 @@ export default function CalendarScreen() {
           body: `Masz 24 godziny na wykonanie zadania.`,
           data: { taskId: task.id },
         },
-        trigger,
+        trigger: trigger, // Przekazanie Date bezpośrednio
       });
+
+      console.log('Powiadomienie zaplanowane z ID:', notificationId);
 
       // Zaktualizuj zadanie w Firestore z notificationId
       const taskRef = doc(db, 'tasks', task.id);
@@ -326,12 +342,20 @@ export default function CalendarScreen() {
   const cancelScheduledNotifications = async (taskId) => {
     const task = tasks.find(t => t.id === taskId);
     if (task && task.notificationId) {
-      await Notifications.cancelScheduledNotificationAsync(task.notificationId);
-      // Usuń notificationId z Firestore
-      const taskRef = doc(db, 'tasks', taskId);
-      await updateDoc(taskRef, {
-        notificationId: null,
-      });
+      try {
+        await Notifications.cancelScheduledNotificationAsync(task.notificationId);
+        console.log('Powiadomienie anulowane z ID:', task.notificationId);
+
+        // Usuń notificationId z Firestore
+        const taskRef = doc(db, 'tasks', taskId);
+        await updateDoc(taskRef, {
+          notificationId: null,
+        });
+
+        console.log('notificationId usunięty z zadania:', taskId);
+      } catch (error) {
+        console.error('Błąd przy anulowaniu powiadomienia:', error);
+      }
     }
   };
 
@@ -339,7 +363,10 @@ export default function CalendarScreen() {
   const scheduleAllNotifications = async () => {
     for (const task of tasks) {
       if (!task.notificationId) { // Harmonogramuj tylko, jeśli nie ma notificationId
+        console.log('Harmonogramowanie powiadomienia dla zadania bez notificationId:', task.name);
         await scheduleNotification(task);
+      } else {
+        console.log('Powiadomienie już istnieje dla zadania:', task.name, 'ID:', task.notificationId);
       }
     }
   };
@@ -350,45 +377,6 @@ export default function CalendarScreen() {
       scheduleAllNotifications();
     }
   }, [loading, tasks]);
-
-  // // Funkcja do eksportowania wszystkich zadań do kalendarza systemowego
-  // const exportTasksToCalendar = async () => {
-  //   try {
-  //     // Sprawdzenie uprawnień
-  //     const status = await CalendarExpo.requestCalendarPermissionsAsync();
-  //     if (status.status !== 'granted') {
-  //       Alert.alert('Brak uprawnień', 'Aplikacja nie ma dostępu do kalendarza.');
-  //       return;
-  //     }
-
-  //     // Iteracja przez wszystkie zadania i dodawanie ich do kalendarza
-  //     for (const task of tasks) {
-  //       if (!calendarId) {
-  //         Alert.alert('Błąd', 'Kalendarz nie jest dostępny.');
-  //         return;
-  //       }
-
-  //       // Konwersja daty na Date object
-  //       const taskDate = new Date(task.deadline);
-  //       // Ustawienie czasu na początek dnia
-  //       taskDate.setHours(9, 0, 0); // Możesz dostosować godzinę
-
-  //       // Dodanie wydarzenia do kalendarza
-  //       await CalendarExpo.createEventAsync(calendarId, {
-  //         title: task.name,
-  //         startDate: taskDate,
-  //         endDate: new Date(taskDate.getTime() + 60 * 60 * 1000), // 1 godzina później
-  //         notes: task.description,
-  //         color: task.color,
-  //       });
-  //     }
-
-  //     Alert.alert('Sukces', 'Wszystkie zadania zostały wyeksportowane do kalendarza.');
-  //   } catch (error) {
-  //     console.error('Błąd przy eksportowaniu do kalendarza:', error);
-  //     Alert.alert('Błąd', 'Nie udało się wyeksportować zadań do kalendarza.');
-  //   }
-  // };
 
   // Funkcja do eksportowania pojedynczego zadania do Kalendarza Google
   const exportTaskToGoogleCalendar = (task) => {
@@ -427,7 +415,6 @@ export default function CalendarScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-
       <Calendar
         key={`${colors.background}-${themeVersion}`}
         onDayPress={onDayPress}
@@ -488,8 +475,8 @@ export default function CalendarScreen() {
                         color="#DB4437"
                         onPress={() => exportTaskToGoogleCalendar(item)}
                       />
-                      {/* Eksport do Kalendarza Systemowego
-                      <IconButton
+                      {/* Eksport do Kalendarza Systemowego */}
+                      {/* <IconButton
                         icon="calendar-export"
                         size={20}
                         color={colors.primary}
