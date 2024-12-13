@@ -175,6 +175,7 @@ export default function HomeScreen() {
             }
           }}
           fabStyle={{ backgroundColor: colors.primary }}
+          color={colors.background}
         />
 
         <Portal>
@@ -363,10 +364,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 20,
   },
-  datePicker: {
-    flex: 1,
-    alignSelf: 'flex-end',
+  dateButton: {
+    height: 50,
+    borderRadius: 8,
   },
-  
-  
 });

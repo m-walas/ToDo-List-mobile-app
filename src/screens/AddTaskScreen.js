@@ -163,7 +163,8 @@ const styles = StyleSheet.create({
     marginTop: 15,
   },
   dateButton: {
-    marginLeft: 10,
+    marginLeft: 'auto',
+    marginTop: 10,
   },
   pickerContainer: {
     borderWidth: 1,

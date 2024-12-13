@@ -5,10 +5,10 @@ import {
   View, 
   StyleSheet, 
   FlatList, 
-  TouchableOpacity, 
   Alert, 
   UIManager, 
-  Platform 
+  Platform,
+  TouchableOpacity
 } from 'react-native';
 import { 
   Text, 
@@ -16,10 +16,11 @@ import {
   useTheme, 
   FAB, 
   Portal, 
-  List, 
   Menu, 
   Button,
-  Dialog
+  Dialog,
+  Card,
+  Divider
 } from 'react-native-paper';
 import { 
   collection, 
@@ -42,65 +43,86 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const TaskItem = memo(({ item, toggleCompletion, navigateToTask, openMenu, openMoveModal, prioritize }) => {
+const TaskItem = memo(({ 
+  item, 
+  toggleCompletion, 
+  navigateToTask, 
+  openMenu, 
+  openMoveModal, 
+  prioritize, 
+  deleteTask 
+}) => {
   const { colors } = useTheme();
   
   return (
-    <View style={styles.taskItem}>
-      <TouchableOpacity onPress={() => toggleCompletion(item.id, item.isCompleted)}>
+    <Card 
+      style={[styles.taskCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      elevation={2}
+    >
+      <View style={styles.taskItem}>
         <IconButton
           icon={item.isCompleted ? 'check-circle' : 'checkbox-blank-circle-outline'}
           size={24}
           color={colors.primary}
+          onPress={() => toggleCompletion(item.id, item.isCompleted)}
         />
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigateToTask(item.id)} style={{ flex: 1 }}>
-        <Text style={item.isCompleted ? [styles.completedTask, { color: colors.text }] : [styles.incompleteTask, { color: colors.text }]}>
-          {item.text}
-        </Text>
-      </TouchableOpacity>
-      <Menu
-        visible={item.menuVisible}
-        onDismiss={() => openMenu(item.id, false)}
-        anchor={
-          <IconButton
-            icon="dots-vertical"
-            size={24}
-            color={colors.primary}
-            onPress={() => openMenu(item.id, true)}
+        <TouchableOpacity 
+          onPress={() => navigateToTask(item.id)} 
+          style={styles.taskContent}
+        >
+          <Text 
+            style={[
+              styles.taskText, 
+              item.isCompleted ? styles.completedTask : styles.incompleteTask,
+              { color: colors.text }
+            ]}
+          >
+            {item.text}
+          </Text>
+        </TouchableOpacity>
+        <Menu
+          visible={item.menuVisible}
+          onDismiss={() => openMenu(item.id, false)}
+          anchor={
+            <IconButton
+              icon="dots-vertical"
+              size={24}
+              color={colors.primary}
+              onPress={() => openMenu(item.id, true)}
+            />
+          }
+        >
+          <Menu.Item
+            onPress={() => {
+              openMenu(item.id, false);
+              openMoveModal(item.id); // Open move modal
+            }}
+            title="Przenieś do innej tablicy"
           />
-        }
-      >
-        <Menu.Item
-          onPress={() => {
-            openMenu(item.id, false);
-            openMoveModal(item.id); // Otwórz modal
-          }}
-          title="Przenieś do innej tablicy"
+          <Menu.Item
+            onPress={() => {
+              openMenu(item.id, false);
+              Alert.alert(
+                'Usuń Zadanie',
+                'Czy na pewno chcesz usunąć to zadanie?',
+                [
+                  { text: 'Anuluj', style: 'cancel' },
+                  { text: 'Usuń', style: 'destructive', onPress: () => deleteTask(item.id) },
+                ],
+                { cancelable: true }
+              );
+            }}
+            title="Usuń zadanie"
+          />
+        </Menu>
+        <IconButton
+          icon={item.isPrioritized ? 'star' : 'star-outline'}
+          size={24}
+          color={item.isPrioritized ? colors.primary : colors.text}
+          onPress={() => prioritize(item.id, item.isPrioritized)}
         />
-        <Menu.Item
-          onPress={() => {
-            openMenu(item.id, false);
-            Alert.alert(
-              'Usuń Zadanie',
-              'Czy na pewno chcesz usunąć to zadanie?',
-              [
-                { text: 'Anuluj', style: 'cancel' },
-                { text: 'Usuń', style: 'destructive', onPress: () => deleteTask(item.id) },
-              ],
-              { cancelable: true }
-            );
-          }}
-          title="Usuń zadanie"
-        />
-      </Menu>
-      <IconButton
-        icon={item.isPrioritized ? 'star' : 'star-outline'}
-        size={24}
-        color={item.isPrioritized ? '#ffd700' : colors.text}
-        onPress={() => prioritize(item.id, item.isPrioritized)}
-      />
-    </View>
+      </View>
+    </Card>
   );
 });
 
@@ -109,12 +131,10 @@ export default function AllTasksScreen() {
   const navigation = useNavigation();
   const [tasks, setTasks] = useState([]);
   const [boards, setBoards] = useState([]);
-  const [menuVisible, setMenuVisible] = useState({});
+  const [showCompleted, setShowCompleted] = useState(false);
   const [moveModalVisible, setMoveModalVisible] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState(null);
-  const [showCompleted, setShowCompleted] = useState(false);
   const [selectedBoard, setSelectedBoard] = useState('');
-
 
   useEffect(() => {
     const tasksRef = collection(db, 'tasks');
@@ -162,6 +182,7 @@ export default function AllTasksScreen() {
       });
     } catch (error) {
       console.error('Error updating task:', error);
+      Alert.alert('Błąd', 'Nie udało się zaktualizować zadania.');
     }
   };
 
@@ -173,6 +194,7 @@ export default function AllTasksScreen() {
       });
     } catch (error) {
       console.error('Error prioritizing task:', error);
+      Alert.alert('Błąd', 'Nie udało się zmienić priorytetu zadania.');
     }
   };
 
@@ -182,6 +204,7 @@ export default function AllTasksScreen() {
       await deleteDoc(taskRef);
     } catch (error) {
       console.error('Error deleting task:', error);
+      Alert.alert('Błąd', 'Nie udało się usunąć zadania.');
     }
   };
 
@@ -193,6 +216,7 @@ export default function AllTasksScreen() {
       });
       setMoveModalVisible(false);
       setSelectedTaskId(null);
+      setSelectedBoard('');
       Alert.alert('Sukces', 'Zadanie zostało przeniesione.');
     } catch (error) {
       console.error('Error moving task:', error);
@@ -201,8 +225,8 @@ export default function AllTasksScreen() {
   };
 
   const openMoveModal = (taskId) => {
-    setSelectedTaskId(taskId); // Ustaw ID zadania do przeniesienia
-    setMoveModalVisible(true); // Pokaż modal
+    setSelectedTaskId(taskId); // Set task ID to move
+    setMoveModalVisible(true); // Show modal
   };
 
   const openMenu = (taskId, visible) => {
@@ -228,6 +252,7 @@ export default function AllTasksScreen() {
             openMenu={openMenu}
             openMoveModal={openMoveModal}
             prioritize={prioritizeTask}
+            deleteTask={deleteTask} // Przekazanie deleteTask jako prop
           />
         )}
         keyExtractor={(item) => item.id}
@@ -235,7 +260,11 @@ export default function AllTasksScreen() {
         ListHeaderComponent={
           <View style={styles.header}>
             <Text style={[styles.headerText, { color: colors.text }]}>Wszystkie zadania</Text>
-            <Button onPress={() => setShowCompleted(!showCompleted)} mode="text" color={colors.primary}>
+            <Button 
+              onPress={() => setShowCompleted(!showCompleted)} 
+              mode="text" 
+              color={colors.primary}
+            >
               {showCompleted ? 'Ukryj ukończone' : 'Pokaż ukończone'}
             </Button>
           </View>
@@ -248,6 +277,7 @@ export default function AllTasksScreen() {
         ListFooterComponent={
           showCompleted && completedTasks.length > 0 ? (
             <View style={styles.completedContainer}>
+              <Divider style={{ marginVertical: 10 }} />
               <Text style={[styles.headerText, { color: colors.text }]}>Ukończone Zadania</Text>
               <FlatList
                 data={completedTasks}
@@ -258,6 +288,7 @@ export default function AllTasksScreen() {
                     navigateToTask={(id) => navigation.navigate('TaskModal', { taskId: id })}
                     openMenu={openMenu}
                     prioritize={prioritizeTask}
+                    deleteTask={deleteTask} // Przekazanie deleteTask jako prop
                   />
                 )}
                 keyExtractor={(item) => item.id}
@@ -267,18 +298,19 @@ export default function AllTasksScreen() {
         }
       />
       <FAB
-        style={styles.fab}
+        style={[styles.fab, { backgroundColor: colors.primary }]}
         small
         icon="plus"
         onPress={() => navigation.navigate('AddTaskScreen', { boardId: null })}
         label="Dodaj zadanie"
+        color={colors.background}
       />
 
       <Portal>
         <Dialog 
           visible={moveModalVisible} 
           onDismiss={() => setMoveModalVisible(false)} 
-          contentContainerStyle={styles.modalContainer}
+          style={{ backgroundColor: colors.surface }}
         >
           <Dialog.Title>Przenieś do innej tablicy</Dialog.Title>
           <Dialog.Content>
@@ -288,6 +320,7 @@ export default function AllTasksScreen() {
                 onValueChange={(itemValue) => setSelectedBoard(itemValue)}
                 style={[styles.picker, { color: colors.text }]}
                 dropdownIconColor={colors.text}
+                mode="dropdown"
               >
                 <Picker.Item label="Wybierz Tablicę" value="" />
                 {boards.map((board) => (
@@ -305,11 +338,19 @@ export default function AllTasksScreen() {
                   Alert.alert('Błąd', 'Proszę wybrać tablicę.');
                 }
               }}
+              mode="contained"
               color={colors.primary}
             >
               Przenieś
             </Button>
-            <Button onPress={() => setMoveModalVisible(false)} color={colors.primary}>
+            <Button 
+              onPress={() => {
+                setMoveModalVisible(false);
+                setSelectedBoard('');
+              }} 
+              mode="outlined" 
+              color={colors.primary}
+            >
               Anuluj
             </Button>
           </Dialog.Actions>
@@ -325,7 +366,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   list: {
-    paddingBottom: 80,
+    paddingBottom: 100,
   },
   header: {
     flexDirection: 'row',
@@ -334,15 +375,25 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   headerText: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
+  },
+  taskCard: {
+    marginVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
   },
   taskItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 5,
-    borderBottomColor: '#ccc',
-    borderBottomWidth: 1,
+    padding: 5,
+  },
+  taskContent: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  taskText: {
+    fontSize: 16,
   },
   completedTask: {
     textDecorationLine: 'line-through',
@@ -364,19 +415,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     maxHeight: '80%',
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    overflow: 'hidden',
   },
-  modalButton: {
-    marginTop: 10,
+  picker: {
+    width: '100%',
+    height: 50,
   },
   completedContainer: {
     marginTop: 20,
   },
   emptyContainer: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 20,
@@ -384,17 +436,5 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: 'gray',
   },
-  pickerContainer: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    marginBottom: 10,
-    overflow: 'hidden',
-  },
-  picker: {
-    width: '100%',
-  },
-  
 });

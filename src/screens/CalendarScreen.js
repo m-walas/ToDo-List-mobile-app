@@ -503,6 +503,7 @@ export default function CalendarScreen() {
         icon="plus"
         onPress={() => navigation.navigate('AddTaskScreen', { boardId: null })}
         label="Dodaj zadanie"
+        color={colors.background}
       />
 
       <Portal>

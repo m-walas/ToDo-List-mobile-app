@@ -33,11 +33,11 @@ const CustomDefaultTheme = {
   colors: {
     ...NavigationDefaultTheme.colors,
     ...PaperDefaultTheme.colors,
-    background: '#ffffff',
-    text: '#24292e',
-    primary: '#0366d6',
-    accent: '#586069',
-    surface: '#f6f8fa',
+    background: '#ffffff', // white
+    text: '#24292e', // dark grey
+    primary: '#0366d6', // blue
+    accent: '#586069', // grey
+    surface: '#f6f8fa', // light grey
   },
 };
 
@@ -47,11 +47,11 @@ const CustomDarkTheme = {
   colors: {
     ...NavigationDarkTheme.colors,
     ...PaperDarkTheme.colors,
-    background: '#121212',
-    text: '#FFFFFF',
-    primary: '#BB86FC',
-    accent: '#03DAC6',
-    surface: '#1E1E1E',
+    background: '#121212', // dark grey
+    text: '#FFFFFF', // white 
+    primary: '#BB86FC', // purple
+    accent: '#03DAC6', // teal
+    surface: '#1E1E1E', // dark grey
   },
 };
 
