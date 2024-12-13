@@ -1,27 +1,29 @@
 // src/screens/GitHubTasksScreen.js
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   View, 
   Text, 
-  Button, 
   StyleSheet, 
   Alert, 
   FlatList, 
   TouchableOpacity, 
   Modal, 
-  TextInput, 
-  ScrollView 
+  TextInput 
 } from 'react-native';
 import * as AuthSession from 'expo-auth-session';
 import { auth } from '../firebase';
 import { GithubAuthProvider, signInWithCredential } from 'firebase/auth';
 import { GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET } from '@env';
 import * as WebBrowser from 'expo-web-browser';
+import { useTheme, Provider as PaperProvider } from 'react-native-paper';
 
 const REDIRECT_URI = AuthSession.makeRedirectUri({ scheme: 'todolistmobileapp' });
 
 const GitHubTasksScreen = () => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
+
   const [githubToken, setGithubToken] = useState(null);
   const [repos, setRepos] = useState([]);
   const [issues, setIssues] = useState([]);
@@ -86,6 +88,7 @@ const GitHubTasksScreen = () => {
 
   const fetchRepos = async () => {
     if (!githubToken) return;
+    setIsRefreshingRepos(true);
     try {
       const response = await fetch('https://api.github.com/user/repos', {
         headers: {
@@ -101,11 +104,14 @@ const GitHubTasksScreen = () => {
     } catch (error) {
       console.error(error);
       Alert.alert('Error', 'Something went wrong while fetching repos.');
+    } finally {
+      setIsRefreshingRepos(false);
     }
   };
 
   const fetchIssues = async (owner, repoName, state = 'open') => {
     if (!githubToken) return;
+    setIsRefreshingIssues(true);
     try {
       const response = await fetch(`https://api.github.com/repos/${owner}/${repoName}/issues?state=${state}`, {
         headers: {
@@ -121,6 +127,8 @@ const GitHubTasksScreen = () => {
     } catch (error) {
       console.error(error);
       Alert.alert('Error', 'Something went wrong while fetching issues.');
+    } finally {
+      setIsRefreshingIssues(false);
     }
   };
 
@@ -354,24 +362,26 @@ const GitHubTasksScreen = () => {
             <TextInput
               style={styles.input}
               placeholder="Issue Title"
+              placeholderTextColor={colors.disabled || '#a1a1a1'}
               value={newIssueTitle}
               onChangeText={setNewIssueTitle}
             />
             <TextInput
               style={[styles.input, { height: 100 }]}
               placeholder="Issue Description"
+              placeholderTextColor={colors.disabled || '#a1a1a1'}
               multiline
               value={newIssueBody}
               onChangeText={setNewIssueBody}
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity 
-                style={[styles.modalButton, { backgroundColor: '#28a745' }]} 
+                style={styles.modalButton} 
                 onPress={createIssue}>
                 <Text style={styles.modalButtonText}>Create</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.modalButton, { backgroundColor: '#d73a49' }]} 
+                style={[styles.modalButton, { backgroundColor: colors.error }]} 
                 onPress={() => setCreateIssueModalVisible(false)}>
                 <Text style={styles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -381,7 +391,7 @@ const GitHubTasksScreen = () => {
       </Modal>
       
       {!githubToken && (
-        <View style={{ alignItems: 'center', marginTop: 40 }}>
+        <View style={styles.infoContainer}>
           <Text style={styles.infoText}>Please log in to proceed.</Text>
         </View>
       )}
@@ -390,76 +400,93 @@ const GitHubTasksScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+// Funkcja do generowania stylów na podstawie motywu
+const getStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f6f8fa',
+    backgroundColor: colors.background,
     paddingTop: 50
   },
   headerContainer: {
     alignItems: 'center',
     paddingHorizontal: 16,
-    marginBottom: 20
+    marginBottom: 20,
+    backgroundColor: colors.surface
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#24292e',
+    color: colors.text,
     marginBottom: 20
   },
   loginButton: {
-    backgroundColor: '#0366d6',
+    backgroundColor: colors.primary,
     borderRadius: 5,
     paddingVertical: 10,
     paddingHorizontal: 20
   },
   loginButtonText: {
-    color: '#fff',
+    color: colors.background,
     fontSize: 16,
     fontWeight: '600'
   },
   fetchButton: {
-    backgroundColor: '#28a745',
+    backgroundColor: colors.primary,
     borderRadius: 5,
     paddingVertical: 10,
-    paddingHorizontal: 20
+    paddingHorizontal: 20,
+    marginTop: 10
   },
   fetchButtonText: {
-    color: '#fff',
+    color: colors.background,
     fontSize: 16,
     fontWeight: '600'
   },
   repoListContainer: {
     flex: 1,
-    padding: 16
+    padding: 16,
+    backgroundColor: colors.background
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#24292e',
+    color: colors.text,
     marginBottom: 10
   },
   repoItem: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     padding: 15,
     borderRadius: 5,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#e1e4e8'
+    borderColor: colors.border
   },
   repoName: {
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 5,
-    color: '#0366d6'
+    color: colors.primary
   },
   repoDesc: {
     fontSize: 14,
-    color: '#586069'
+    color: colors.text
+  },
+  refreshButton: {
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginTop: 10,
+    backgroundColor: colors.primary
+  },
+  refreshButtonText: {
+    color: colors.background,
+    fontSize: 16,
+    fontWeight: '600',
   },
   issuesContainer: {
     flex: 1,
-    padding: 16
+    padding: 16,
+    backgroundColor: colors.background
   },
   toggleContainer: {
     flexDirection: 'row',
@@ -467,48 +494,48 @@ const styles = StyleSheet.create({
   },
   toggleButton: {
     flex: 1,
-    backgroundColor: '#e1e4e8',
+    backgroundColor: colors.surface,
     marginRight: 10,
     paddingVertical: 10,
     borderRadius: 5,
     alignItems: 'center'
   },
   toggleButtonActive: {
-    backgroundColor: '#0366d6'
+    backgroundColor: colors.primary
   },
   toggleButtonText: {
-    color: '#24292e',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600'
   },
   toggleButtonTextActive: {
-    color: '#fff'
+    color: colors.background
   },
   createIssueButton: {
-    backgroundColor: '#28a745',
+    backgroundColor: colors.primary,
     padding: 10,
     borderRadius: 5,
     alignItems: 'center',
     marginBottom: 10
   },
   createIssueButtonText: {
-    color: '#fff',
+    color: colors.background,
     fontSize: 16,
     fontWeight: '600'
   },
   infoText: {
     fontSize: 16,
-    color: '#24292e',
+    color: colors.text,
     textAlign: 'center',
     marginTop: 10
   },
   issueItem: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     padding: 15,
     borderRadius: 5,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#e1e4e8'
+    borderColor: colors.border
   },
   issueHeader: {
     flexDirection: 'row',
@@ -519,39 +546,44 @@ const styles = StyleSheet.create({
   issueTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#24292e'
+    color: colors.text
   },
   closeButton: {
-    backgroundColor: '#d73a49',
+    backgroundColor: colors.error,
     borderRadius: 5,
     paddingVertical: 5,
     paddingHorizontal: 10
   },
   closeButtonText: {
-    color: '#fff',
+    color: colors.background,
     fontSize: 14,
     fontWeight: '600'
   },
   closedLabel: {
-    color: '#d73a49',
+    color: colors.text,
     fontWeight: '700'
   },
   issueBody: {
     fontSize: 14,
-    color: '#586069'
+    color: colors.text
   },
   issueBodyEmpty: {
     fontSize: 14,
     fontStyle: 'italic',
-    color: '#586069'
+    color: colors.text
   },
   backButton: {
     marginTop: 20,
-    alignSelf: 'flex-start'
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: colors.primary,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 5
   },
   backButtonText: {
     fontSize: 16,
-    color: '#0366d6'
+    color: colors.primary
   },
   modalOverlay: {
     flex: 1,
@@ -560,24 +592,25 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   modalContainer: {
-    backgroundColor: '#fff',
     width: '80%',
     padding: 20,
-    borderRadius: 10
+    borderRadius: 10,
+    backgroundColor: colors.surface
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 15,
-    color: '#24292e'
+    color: colors.text
   },
   input: {
     borderWidth: 1,
-    borderColor: '#e1e4e8',
+    borderColor: colors.border,
     borderRadius: 5,
     padding: 10,
     marginBottom: 15,
-    backgroundColor: '#fafbfc'
+    backgroundColor: colors.surface,
+    color: colors.text
   },
   modalButtons: {
     flexDirection: 'row',
@@ -587,25 +620,18 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
     width: '45%',
-    alignItems: 'center'
+    alignItems: 'center',
+    backgroundColor: colors.primary
   },
   modalButtonText: {
-    color: '#fff',
+    color: colors.background,
     fontSize: 16,
     fontWeight: '600'
   },
-  refreshButton: {
-    backgroundColor: '#0366d6',
-    padding: 10,
-    borderRadius: 5,
+  infoContainer: {
     alignItems: 'center',
-    marginTop: 10,
-  },
-  refreshButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+    marginTop: 40
+  }
 });
 
 export default GitHubTasksScreen;

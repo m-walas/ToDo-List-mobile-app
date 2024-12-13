@@ -7,7 +7,6 @@ import {
 } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
 
 import {
   FIREBASE_API_KEY,
@@ -34,7 +33,6 @@ const auth = initializeAuth(app, {
 });
 
 const db = getFirestore(app);
-const storage = getStorage(app);
 
 const createUserProfile = async (user) => {
   const userDocRef = doc(db, 'users', user.uid);
@@ -43,7 +41,6 @@ const createUserProfile = async (user) => {
     await setDoc(userDocRef, {
       name: user.displayName || '',
       surname: '',
-      avatar: null,
       userId: user.uid,
       createdAt: new Date(),
     });
@@ -56,4 +53,4 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 
-export { auth, db, storage };
+export { auth, db };
